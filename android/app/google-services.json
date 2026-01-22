@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "977549736796",
+    "project_id": "fitzee-c7e4d",
+    "storage_bucket": "fitzee-c7e4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:977549736796:android:68082ca33748a1b18d9f99",
+        "android_client_info": {
+          "package_name": "com.fitness.fitzee"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "977549736796-gftknkg46go9hv0pbvemle363m5am7t6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fitness.fitzee",
+            "certificate_hash": "223e6a39a8bdf7c179991eb4655cf8d43ec77c27"
+          }
+        },
+        {
+          "client_id": "977549736796-nmvdgm1mu0veiksai91kuciuvpa4pvfl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO9mt7X9ZluhDS4CcE2ZWaWVkLOKoZsq0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "977549736796-nmvdgm1mu0veiksai91kuciuvpa4pvfl.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "977549736796-frpugns2isj028n3kpv8cthmnp0qrtsl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.fitness.fitzee"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

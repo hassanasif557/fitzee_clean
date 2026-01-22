@@ -1,0 +1,29 @@
+{
+  "splash": {
+    "app_name": "Fitzee",
+    "tagline": "ENTRENAMIENTO PERSONAL AI",
+    "initializing": "INICIALIZANDO MOTOR DE POSTURA AI"
+  },
+  "auth": {
+    "phone_title": "Ingresa Tu Número de Teléfono",
+    "phone_subtitle": "Te enviaremos un código de verificación",
+    "phone_hint": "Número de teléfono",
+    "phone_required": "El número de teléfono es obligatorio",
+    "phone_invalid": "Por favor ingresa un número de teléfono válido",
+    "continue": "Continuar",
+    "otp_title": "Ingresa el Código de Verificación",
+    "otp_subtitle": "Hemos enviado un código de 6 dígitos a tu teléfono",
+    "otp_required": "El código OTP es obligatorio",
+    "otp_invalid": "Por favor ingresa un código OTP válido de 6 dígitos",
+    "verify": "Verificar",
+    "resend_otp": "Reenviar Código"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "retry": "Reintentar",
+    "ok": "OK",
+    "cancel": "Cancelar"
+  }
+}
+

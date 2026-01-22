@@ -1,0 +1,29 @@
+{
+  "splash": {
+    "app_name": "Fitzee",
+    "tagline": "AI PERSONAL COACHING",
+    "initializing": "INITIALIZING AI POSTURE ENGINE"
+  },
+  "auth": {
+    "phone_title": "Enter Your Phone Number",
+    "phone_subtitle": "We'll send you a verification code",
+    "phone_hint": "Phone number",
+    "phone_required": "Phone number is required",
+    "phone_invalid": "Please enter a valid phone number",
+    "continue": "Continue",
+    "otp_title": "Enter Verification Code",
+    "otp_subtitle": "We've sent a 6-digit code to your phone",
+    "otp_required": "OTP is required",
+    "otp_invalid": "Please enter a valid 6-digit OTP",
+    "verify": "Verify",
+    "resend_otp": "Resend Code"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "ok": "OK",
+    "cancel": "Cancel"
+  }
+}
+
