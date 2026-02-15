@@ -1,13 +1,26 @@
+/// App entry point. Initializes Firebase, Crashlytics, notifications, Stripe, EasyLocalization,
+/// and SQLite (Drift) for offline-first. SQLite is the source of truth; Firebase syncs when online.
+import 'dart:convert';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:fitzee_new/core/database/database_provider.dart';
 import 'package:fitzee_new/core/routes/app_router.dart';
 import 'package:fitzee_new/core/constants/theme_config.dart';
+import 'package:fitzee_new/core/services/crashlytics_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
 import 'package:fitzee_new/core/utils/theme_cubit.dart';
 import 'package:fitzee_new/core/utils/locale_cubit.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
+import 'core/services/ai_meal_service.dart';
 import 'firebase_options.dart';
+
+String publishedKey = "pk_test_51Stnr9QpjDOMmIK5OiW5L3QHFFeJqZRfuDpvHljZpn5bC5vqI4wuNZLztxweFONAGVRUKA91oc4ygGlV9XFftMpm00BHciDKQO";
+String secretKey = "REMOVED";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,8 +28,25 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  // Initialize EasyLocalization
+  await CrashlyticsService.init();
+  await NotificationService.init();
+  NotificationService.setupForegroundHandler();
+  await Future.any([
+    NotificationService.refreshTokenForCurrentUser(),
+    Future.delayed(const Duration(seconds: 5), () {}),
+  ]);
   await EasyLocalization.ensureInitialized();
+  try {
+    await initDatabase();
+  } catch (e) {
+    assert(false, 'Database init failed: $e');
+  }
+
+  Stripe.publishableKey = publishedKey;
+  await Stripe.instance.applySettings();
+
+
+
 
   runApp(
     EasyLocalization(

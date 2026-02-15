@@ -1,3 +1,6 @@
+/// Cubit for the leaderboard screen (Bloc/Cubit state management).
+/// Loads entries and current user rank via use cases (Clean Architecture).
+/// Guards all [emit] calls with [isClosed] to avoid "Cannot emit after close" crashes.
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/features/leaderboard/domain/entities/leaderboard_entry.dart';
@@ -18,7 +21,8 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
     LeaderboardFilter filter = LeaderboardFilter.healthScore,
     LeaderboardPeriod period = LeaderboardPeriod.week,
   }) async {
-    emit(LeaderboardLoading());
+    if (isClosed) return;
+    if (!isClosed) emit(LeaderboardLoading());
 
     try {
       final entries = await getLeaderboardUseCase(
@@ -26,8 +30,8 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
         period: period,
         limit: 100,
       );
+      if (isClosed) return;
 
-      // Get current user's entry
       LeaderboardEntry? currentUserEntry;
       try {
         final userId = await LocalStorageService.getUserId();
@@ -38,23 +42,24 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
             period: period,
           );
         }
-      } catch (e) {
-        // User might not be in leaderboard, continue without their entry
-        print('Warning: Could not get user entry: $e');
-      }
+      } catch (_) {}
+      if (isClosed) return;
 
-      emit(LeaderboardLoaded(
-        entries: entries,
-        currentUserEntry: currentUserEntry,
-        currentFilter: filter,
-        currentPeriod: period,
-      ));
+      if (!isClosed) {
+        emit(LeaderboardLoaded(
+          entries: entries,
+          currentUserEntry: currentUserEntry,
+          currentFilter: filter,
+          currentPeriod: period,
+        ));
+      }
     } catch (e) {
-      emit(LeaderboardError(e.toString()));
+      if (!isClosed) emit(LeaderboardError(e.toString()));
     }
   }
 
   Future<void> changeFilter(LeaderboardFilter filter) async {
+    if (isClosed) return;
     if (state is LeaderboardLoaded) {
       final currentState = state as LeaderboardLoaded;
       await loadLeaderboard(
@@ -65,6 +70,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
   }
 
   Future<void> changePeriod(LeaderboardPeriod period) async {
+    if (isClosed) return;
     if (state is LeaderboardLoaded) {
       final currentState = state as LeaderboardLoaded;
       await loadLeaderboard(
@@ -75,6 +81,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
   }
 
   Future<void> refresh() async {
+    if (isClosed) return;
     if (state is LeaderboardLoaded) {
       final currentState = state as LeaderboardLoaded;
       await loadLeaderboard(

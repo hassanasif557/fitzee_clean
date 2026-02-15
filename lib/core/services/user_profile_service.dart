@@ -1,78 +1,78 @@
+import 'package:fitzee_new/core/data/datasources/local_user_profile_datasource.dart';
 import 'package:fitzee_new/core/services/connectivity_service.dart';
 import 'package:fitzee_new/core/services/firestore_user_profile_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/features/onboard/domain/entities/user_profile.dart';
 
-/// Unified service that handles user profile operations
-/// with automatic fallback to local storage when offline
+/// Offline-first: always read from local first (SQLite then SharedPreferences). Never block on network.
+/// When online, sync to/from Firestore in background. Saves go to local first, then push when connected.
 class UserProfileService {
-  /// Save user profile - saves to both Firestore (if online) and local storage
-  static Future<void> saveUserProfile(UserProfile profile) async {
-    // Always save to local storage first for offline support
-    await LocalStorageService.saveUserProfile(profile);
+  static final LocalUserProfileDataSource _local = LocalUserProfileDataSource();
 
-    // If online, also save to Firestore
+  /// Saves profile to SQLite and SharedPreferences first (source of truth), then pushes to Firestore when online.
+  static Future<void> saveUserProfile(UserProfile profile) async {
+    try {
+      await _local.upsert(profile);
+    } catch (e) {
+      print('Warning: Drift save failed, using SharedPreferences only: $e');
+    }
+    await LocalStorageService.saveUserProfile(profile);
     final hasInternet = await ConnectivityService.hasInternetConnection();
     if (hasInternet && profile.userId != null && profile.userId!.isNotEmpty) {
       try {
         await FirestoreUserProfileService.saveUserProfile(profile);
+        await _local.markSynced(profile.userId!, firestoreId: profile.userId);
       } catch (e) {
-        // If Firestore save fails, local storage already has the data
-        // Log error but don't throw - app can continue with local data
-        print('Warning: Failed to save to Firestore, using local storage: $e');
+        print('Warning: Failed to save to Firestore, will retry on next sync: $e');
       }
     }
   }
 
-  /// Get user profile - tries Firestore if online, falls back to local storage
+  /// Always returns from local first (Drift, then SharedPreferences). Never waits on network.
+  /// When online, Firestore is updated in the background for next time; current call returns local data.
   static Future<UserProfile?> getUserProfile(String? userId) async {
-    // Check internet connection
-    final hasInternet = await ConnectivityService.hasInternetConnection();
-
-    // If online and userId is provided, try Firestore first
-    if (hasInternet && userId != null && userId.isNotEmpty) {
-      try {
-        final firestoreProfile =
-            await FirestoreUserProfileService.getUserProfile(userId);
-        
-        // If found in Firestore, sync to local storage and return
-        if (firestoreProfile != null) {
-          await LocalStorageService.saveUserProfile(firestoreProfile);
-          return firestoreProfile;
-        }
-      } catch (e) {
-        // If Firestore fails, fall back to local storage
-        print('Warning: Failed to get from Firestore, using local storage: $e');
+    UserProfile? local;
+    try {
+      local = await _local.getByUserId(userId);
+    } catch (e) {
+      print('Warning: Drift read failed, falling back to SharedPreferences: $e');
+    }
+    if (local == null) {
+      local = await LocalStorageService.getUserProfile();
+      if (local != null && userId != null && userId.isNotEmpty) {
+        try {
+          await _local.upsert(local);
+        } catch (_) {}
       }
     }
-
-    // Fall back to local storage (offline or Firestore unavailable)
-    return await LocalStorageService.getUserProfile();
+    if (userId != null && userId.isNotEmpty) {
+      ConnectivityService.hasInternetConnection().then((online) async {
+        if (!online) return;
+        try {
+          final firestoreProfile =
+              await FirestoreUserProfileService.getUserProfile(userId);
+          if (firestoreProfile != null) {
+            await _local.upsert(firestoreProfile);
+            await _local.markSynced(userId, firestoreId: userId);
+          }
+        } catch (_) {}
+      });
+    }
+    return local;
   }
 
-  /// Update user profile - updates both Firestore (if online) and local storage
   static Future<void> updateUserProfile(UserProfile profile) async {
-    // Always update local storage first
-    await LocalStorageService.saveUserProfile(profile);
-
-    // If online, also update Firestore
-    final hasInternet = await ConnectivityService.hasInternetConnection();
-    if (hasInternet && profile.userId != null && profile.userId!.isNotEmpty) {
-      try {
-        await FirestoreUserProfileService.updateUserProfile(profile);
-      } catch (e) {
-        // If Firestore update fails, local storage already has the data
-        print('Warning: Failed to update Firestore, using local storage: $e');
-      }
-    }
+    await saveUserProfile(profile);
   }
 
-  /// Delete user profile from both Firestore and local storage
+  /// Soft-deletes locally and deletes from Firestore when online.
   static Future<void> deleteUserProfile(String userId) async {
-    // Delete from local storage
+    try {
+      await _local.softDelete(userId);
+    } catch (e) {
+      print('Warning: Drift softDelete failed: $e');
+    }
     await LocalStorageService.clearUserProfile();
-
-    // If online, also delete from Firestore
     final hasInternet = await ConnectivityService.hasInternetConnection();
     if (hasInternet) {
       try {
@@ -83,18 +83,16 @@ class UserProfileService {
     }
   }
 
-  /// Sync local profile to Firestore when connection is restored
-  /// This can be called when app detects internet connection is restored
+  /// Syncs pending local changes to Firestore when connection is restored.
   static Future<void> syncLocalToFirestore(String? userId) async {
     if (userId == null || userId.isEmpty) return;
-
     final hasInternet = await ConnectivityService.hasInternetConnection();
     if (!hasInternet) return;
-
     try {
-      final localProfile = await LocalStorageService.getUserProfile();
+      final localProfile = await _local.getByUserId(userId);
       if (localProfile != null) {
         await FirestoreUserProfileService.saveUserProfile(localProfile);
+        await _local.markSynced(userId, firestoreId: userId);
       }
     } catch (e) {
       print('Warning: Failed to sync local profile to Firestore: $e');

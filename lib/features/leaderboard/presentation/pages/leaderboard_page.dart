@@ -27,7 +27,6 @@ class LeaderboardPage extends StatelessWidget {
           getUserEntryUseCase: getUserEntryUseCase,
         );
 
-        // Load initial data
         cubit.loadLeaderboard();
 
         return cubit;
@@ -185,55 +184,14 @@ class LeaderboardView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Filter Selector
-          const Text(
-            'Rank By',
-            style: TextStyle(
-              color: AppColors.textGray,
-              fontSize: 12,
-            ),
-          ),
           const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildFilterChip(
-                  context,
-                  'Health Score',
-                  LeaderboardFilter.healthScore,
-                  state.currentFilter,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  context,
-                  'Health Improvement',
-                  LeaderboardFilter.healthImprovement,
-                  state.currentFilter,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  context,
-                  'Nutrition',
-                  LeaderboardFilter.nutritionScore,
-                  state.currentFilter,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  context,
-                  'Nutrition Improvement',
-                  LeaderboardFilter.nutritionImprovement,
-                  state.currentFilter,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  context,
-                  'Total Improvement',
-                  LeaderboardFilter.totalImprovement,
-                  state.currentFilter,
-                ),
-              ],
+          // Ranked by Health Score (single metric for fast load)
+          Text(
+            'Ranked by Health Score',
+            style: TextStyle(
+              color: AppColors.primaryGreen.withOpacity(0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -268,42 +226,6 @@ class LeaderboardView extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isSelected ? AppColors.textBlack : AppColors.textWhite,
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(
-    BuildContext context,
-    String label,
-    LeaderboardFilter filter,
-    LeaderboardFilter currentFilter,
-  ) {
-    final isSelected = filter == currentFilter;
-    return GestureDetector(
-      onTap: () {
-        context.read<LeaderboardCubit>().changeFilter(filter);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryGreen
-              : AppColors.backgroundDarkBlueGreen,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primaryGreen
-                : AppColors.textGray.withOpacity(0.3),
-          ),
-        ),
-        child: Text(
-          label,
           style: TextStyle(
             color: isSelected ? AppColors.textBlack : AppColors.textWhite,
             fontSize: 12,
@@ -363,7 +285,7 @@ class LeaderboardView extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Health: ${entry.healthScore} | Nutrition: ${entry.nutritionScore}',
+                  'Health Score: ${entry.healthScore}',
                   style: const TextStyle(
                     color: AppColors.textGray,
                     fontSize: 12,
@@ -372,35 +294,14 @@ class LeaderboardView extends StatelessWidget {
               ],
             ),
           ),
-          // Improvement
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    entry.healthScoreImprovement >= 0
-                        ? Icons.trending_up
-                        : Icons.trending_down,
-                    color: entry.healthScoreImprovement >= 0
-                        ? AppColors.primaryGreen
-                        : AppColors.errorRed,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${entry.healthScoreImprovement >= 0 ? '+' : ''}${entry.healthScoreImprovement}',
-                    style: TextStyle(
-                      color: entry.healthScoreImprovement >= 0
-                          ? AppColors.primaryGreen
-                          : AppColors.errorRed,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          // Health score
+          Text(
+            '${entry.healthScore}',
+            style: const TextStyle(
+              color: AppColors.primaryGreen,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -487,33 +388,7 @@ class LeaderboardView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    _buildMetricChip('Health', entry.healthScore),
-                    const SizedBox(width: 8),
-                    _buildMetricChip('Nutrition', entry.nutritionScore),
-                  ],
-                ),
-                if (entry.healthScoreImprovement != 0 ||
-                    entry.nutritionScoreImprovement != 0) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (entry.healthScoreImprovement != 0)
-                        _buildImprovementChip(
-                          'Health',
-                          entry.healthScoreImprovement,
-                        ),
-                      if (entry.nutritionScoreImprovement != 0) ...[
-                        const SizedBox(width: 8),
-                        _buildImprovementChip(
-                          'Nutrition',
-                          entry.nutritionScoreImprovement,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+                _buildMetricChip('Health Score', entry.healthScore),
               ],
             ),
           ),
@@ -547,38 +422,6 @@ class LeaderboardView extends StatelessWidget {
           color: AppColors.primaryGreen,
           fontSize: 11,
         ),
-      ),
-    );
-  }
-
-  Widget _buildImprovementChip(String label, int improvement) {
-    final isPositive = improvement >= 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isPositive
-            ? AppColors.primaryGreen.withOpacity(0.2)
-            : AppColors.errorRed.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPositive ? Icons.trending_up : Icons.trending_down,
-            size: 12,
-            color: isPositive ? AppColors.primaryGreen : AppColors.errorRed,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '${isPositive ? '+' : ''}$improvement',
-            style: TextStyle(
-              color: isPositive ? AppColors.primaryGreen : AppColors.errorRed,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
       ),
     );
   }

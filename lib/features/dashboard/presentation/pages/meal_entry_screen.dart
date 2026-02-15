@@ -135,6 +135,33 @@ class _MealEntryScreenState extends State<MealEntryScreen> {
     }
   }
 
+  void _openCustomItemSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.backgroundDarkLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _CustomFoodSheet(
+        mealType: _selectedMealType!,
+        date: widget.date ?? DateTime.now(),
+        onSaved: () {
+          Navigator.of(ctx).pop();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Custom food entry saved!'),
+                backgroundColor: AppColors.primaryGreen,
+              ),
+            );
+            Navigator.of(context).pop(true);
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,6 +200,23 @@ class _MealEntryScreenState extends State<MealEntryScreen> {
                   ],
                 ),
               ),
+              // Add custom item button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: OutlinedButton.icon(
+                  onPressed: _openCustomItemSheet,
+                  icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryGreen),
+                  label: const Text(
+                    'Add custom item (name + kcal)',
+                    style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primaryGreen),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               // Search Bar
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -488,6 +532,232 @@ class _MealEntryScreenState extends State<MealEntryScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Bottom sheet for adding a custom food item with name and kcal (and optional macros).
+class _CustomFoodSheet extends StatefulWidget {
+  final String mealType;
+  final DateTime date;
+  final VoidCallback onSaved;
+
+  const _CustomFoodSheet({
+    required this.mealType,
+    required this.date,
+    required this.onSaved,
+  });
+
+  @override
+  State<_CustomFoodSheet> createState() => _CustomFoodSheetState();
+}
+
+class _CustomFoodSheetState extends State<_CustomFoodSheet> {
+  final _nameController = TextEditingController();
+  final _kcalController = TextEditingController();
+  final _proteinController = TextEditingController();
+  final _carbsController = TextEditingController();
+  final _fatController = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _kcalController.dispose();
+    _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter item name'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+    final kcal = double.tryParse(_kcalController.text.trim());
+    if (kcal == null || kcal < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid kcal value'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+    final protein = double.tryParse(_proteinController.text.trim()) ?? 0;
+    final carbs = double.tryParse(_carbsController.text.trim()) ?? 0;
+    final fat = double.tryParse(_fatController.text.trim()) ?? 0;
+
+    setState(() => _saving = true);
+    try {
+      final nutrition = FoodNutrition(
+        calories: kcal,
+        protein: protein,
+        carbs: carbs,
+        fat: fat,
+      );
+      final entry = FoodEntry(
+        foodId: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+        foodName: name,
+        portionType: 'custom',
+        grams: 100,
+        nutrition: nutrition,
+        date: widget.date,
+        mealType: widget.mealType,
+      );
+      final userId = await LocalStorageService.getUserId();
+      await DailyNutritionService.saveFoodEntry(entry, userId: userId);
+      if (mounted) widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Add custom item',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textWhite,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Meal: ${widget.mealType[0].toUpperCase()}${widget.mealType.substring(1)}',
+              style: const TextStyle(color: AppColors.textGray, fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'Item name *',
+                hintText: 'e.g. Homemade cake',
+                labelStyle: const TextStyle(color: AppColors.textGray),
+                hintStyle: const TextStyle(color: AppColors.textGray),
+                filled: true,
+                fillColor: AppColors.backgroundDarkBlueGreen,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              style: const TextStyle(color: AppColors.textWhite),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _kcalController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Calories (kcal) *',
+                hintText: 'e.g. 350',
+                labelStyle: const TextStyle(color: AppColors.textGray),
+                hintStyle: const TextStyle(color: AppColors.textGray),
+                filled: true,
+                fillColor: AppColors.backgroundDarkBlueGreen,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              style: const TextStyle(color: AppColors.textWhite),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Optional macros (grams)',
+              style: TextStyle(color: AppColors.textGray, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _proteinController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Protein',
+                      filled: true,
+                      fillColor: AppColors.backgroundDarkBlueGreen,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    style: const TextStyle(color: AppColors.textWhite),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _carbsController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Carbs',
+                      filled: true,
+                      fillColor: AppColors.backgroundDarkBlueGreen,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    style: const TextStyle(color: AppColors.textWhite),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _fatController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Fat',
+                      filled: true,
+                      fillColor: AppColors.backgroundDarkBlueGreen,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    style: const TextStyle(color: AppColors.textWhite),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: AppColors.textBlack,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textBlack),
+                      )
+                    : const Text('Save custom entry', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

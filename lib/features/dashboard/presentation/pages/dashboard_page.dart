@@ -1,23 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:fitzee_new/core/models/daily_meal_plan.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
-import 'package:fitzee_new/core/services/local_storage_service.dart';
-import 'package:fitzee_new/core/services/user_profile_service.dart';
-import 'package:fitzee_new/core/services/health_score_service.dart';
-import 'package:fitzee_new/core/services/daily_data_service.dart';
-import 'package:fitzee_new/core/services/daily_nutrition_service.dart';
-import 'package:fitzee_new/core/services/workout_generator_service.dart';
-import 'package:fitzee_new/core/services/workout_tracking_service.dart';
+import 'package:fitzee_new/core/constants/theme_ext.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fitzee_new/core/models/food_nutrition.dart';
+import 'package:fitzee_new/core/models/medical_entry.dart';
 import 'package:fitzee_new/core/models/exercise.dart';
+import 'package:fitzee_new/core/services/health_score_service.dart';
+import 'package:fitzee_new/features/dashboard/presentation/core/di/dashboard_di.dart';
+import 'package:fitzee_new/features/dashboard/presentation/cubit/dashboard_cubit.dart';
+import 'package:fitzee_new/features/dashboard/presentation/cubit/dashboard_state.dart';
 import 'package:fitzee_new/features/onboard/domain/entities/user_profile.dart';
 import 'daily_data_collection_screen.dart';
 import 'ai_chat_screen.dart';
 import 'progress_report_screen.dart';
 import 'meal_entry_screen.dart';
+import 'medical_entry_screen.dart';
 import 'workout_player_screen.dart';
+import 'meal_plan_detail_page.dart';
+import '../widgets/dashboard_nav_panel.dart';
 
+/// Main dashboard screen: health score, daily metrics, nutrition, medical, workout, AI coaching.
+/// Uses [DashboardCubit] for all data and auth actions (Clean Architecture + Bloc/Cubit).
+/// State comes only from [BlocBuilder] / [BlocListener]; no local business logic or service calls.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -26,124 +33,46 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  UserProfile? _userProfile;
-  Map<String, dynamic>? _healthScore;
-  Map<String, dynamic>? _dailyData;
-  FoodNutrition? _todayNutrition;
-  WorkoutPlan? _workoutPlan;
-  WorkoutDay? _todayWorkout;
-  int _workoutStreak = 0;
-  bool _isLoading = true;
+  /// Cubit is created via DI so it receives use cases (Clean Architecture).
+  late final DashboardCubit _cubit = DashboardDi.createCubit();
 
   @override
   void initState() {
     super.initState();
-    _checkDailyDataAndLoad();
+    _cubit.checkDailyDataAndLoad();
   }
 
-  Future<void> _checkDailyDataAndLoad() async {
-    // Check if we need to collect daily data
-    final hasYesterdayData = await DailyDataService.hasDataForYesterday();
-    
-    if (!hasYesterdayData && mounted) {
-      // Show daily data collection screen
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => DailyDataCollectionScreen(
-            onComplete: () {
-              // After data is collected, refresh dashboard
-              _refreshData();
-            },
-          ),
-        ),
-      );
-    }
-    
-    await _loadData();
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final userId = await LocalStorageService.getUserId();
-      final profile = await UserProfileService.getUserProfile(userId);
-      
-      // Load daily data
-      final yesterdayData = await DailyDataService.getYesterdayData();
-      final averageData = await DailyDataService.getAverageData(7);
-      
-      // Load today's nutrition
-      final todayNutrition = await DailyNutritionService.getTodayNutrition();
-      
-      // Generate or load workout plan
-      WorkoutPlan? workoutPlan;
-      final savedPlan = await WorkoutTrackingService.getWorkoutPlan();
-      if (savedPlan != null) {
-        workoutPlan = WorkoutPlan.fromJson(savedPlan);
-      } else {
-        // Generate new plan based on profile
-        final daysPerWeek = profile?.trainingDaysPerWeek ?? profile?.exerciseFrequencyPerWeek ?? 3;
-        workoutPlan = WorkoutGeneratorService.generateWorkoutPlan(
-          profile: profile,
-          daysPerWeek: daysPerWeek,
-        );
-        // Save the plan
-        await WorkoutTrackingService.saveWorkoutPlan(workoutPlan.toJson());
-      }
-      
-      final todayWorkout = WorkoutGeneratorService.getTodayWorkout(workoutPlan);
-      final workoutStreak = await WorkoutTrackingService.getWorkoutStreak();
-      
-      // Calculate health score based on BMI (no AI calls)
-      final healthScore = await HealthScoreService.calculateHealthScore(profile);
-
-      setState(() {
-        _userProfile = profile;
-        _dailyData = yesterdayData ?? averageData;
-        _todayNutrition = todayNutrition;
-        _workoutPlan = workoutPlan;
-        _todayWorkout = todayWorkout;
-        _workoutStreak = workoutStreak;
-        _healthScore = healthScore;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Dashboard: Error loading data: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _refreshData() async {
-    await _loadData();
-  }
-
+  /// Shows sign-out confirmation; on confirm, delegates to [DashboardCubit.signOut].
+  /// Navigation and cleanup are handled by the cubit and [BlocListener].
   Future<void> _signOut() async {
+    final theme = Theme.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundDarkLight,
-        title: const Text(
-          'Sign Out',
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(
+          'dashboard.sign_out'.tr(),
           style: TextStyle(
-            color: AppColors.textWhite,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
-          'Are you sure you want to sign out?',
-          style: TextStyle(color: AppColors.textGray),
+        content: Text(
+          'dashboard.sign_out_confirm'.tr(),
+          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textGray),
+            child: Text(
+              'common.cancel'.tr(),
+              style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
             ),
           ),
           ElevatedButton(
@@ -151,195 +80,322 @@ class _DashboardPageState extends State<DashboardPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.errorRed,
             ),
-            child: const Text(
-              'Sign Out',
-              style: TextStyle(color: AppColors.textWhite),
+            child: Text(
+              'dashboard.sign_out'.tr(),
+              style: const TextStyle(color: AppColors.textWhite),
             ),
           ),
         ],
       ),
     );
+    if (confirm == true && mounted) {
+      await _cubit.signOut();
+    }
+  }
 
-    if (confirm == true) {
-      try {
-        await FirebaseAuth.instance.signOut();
-        await LocalStorageService.clearAuthState();
-        if (mounted) {
-          context.go('/');
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${e.toString()}'),
+  /// Shows delete-account confirmation; on confirm, delegates to [DashboardCubit.deleteAccount].
+  /// Redirects to sign-in explicitly after success so redirect is reliable (listener is backup).
+  Future<void> _deleteAccount() async {
+    final theme = Theme.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(
+          'dashboard.delete_account'.tr(),
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'dashboard.delete_account_confirm'.tr(),
+          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'common.cancel'.tr(),
+              style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.errorRed,
             ),
-          );
-        }
-      }
+            child: Text(
+              'dashboard.delete_account'.tr(),
+              style: const TextStyle(color: AppColors.textWhite),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    await _cubit.deleteAccount();
+    if (!mounted) return;
+    // Redirect to sign-in immediately after delete (don't rely only on BlocListener).
+    if (_cubit.state.deleteAccountSuccess && context.mounted) {
+      context.go('/phone_auth');
     }
+  }
+
+  void _openNavPanel() {
+    final navContext = context;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (dialogContext) => DashboardNavPanel(
+        navigatorContext: navContext,
+        onClose: () => Navigator.of(dialogContext).pop(),
+        onSignOut: _signOut,
+        onDeleteAccount: _deleteAccount,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final screenWidth = screenSize.width;
-    final userName = _userProfile?.name?.split(' ').first ?? 'User';
-
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.backgroundDarkBlueGreen,
-              AppColors.backgroundDarkBlueGreen.withOpacity(0.98),
-              AppColors.backgroundDarkBlueGreen,
-            ],
+    return BlocProvider.value(
+      value: _cubit,
+      child: MultiBlocListener(
+        listeners: [
+          // Navigate to sign-in when sign-out or delete-account succeeds.
+          BlocListener<DashboardCubit, DashboardState>(
+            listenWhen: (prev, next) =>
+                prev.signOutSuccess != next.signOutSuccess ||
+                prev.deleteAccountSuccess != next.deleteAccountSuccess,
+            listener: (context, state) {
+              if ((state.signOutSuccess || state.deleteAccountSuccess) &&
+                  context.mounted) {
+                context.go('/phone_auth');
+              }
+            },
           ),
-        ),
-        child: SafeArea(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.primaryGreen,
+          // Show SnackBar when sign-out or delete-account fails.
+          BlocListener<DashboardCubit, DashboardState>(
+            listenWhen: (prev, next) => prev.authError != next.authError,
+            listener: (context, state) {
+              if (state.authError != null &&
+                  state.authError!.isNotEmpty &&
+                  context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.authError!),
+                    backgroundColor: AppColors.errorRed,
                   ),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth < 360 ? 16 : 20,
+                );
+              }
+            },
+          ),
+          // When daily data is needed, open daily data collection screen.
+          BlocListener<DashboardCubit, DashboardState>(
+            listenWhen: (prev, next) =>
+                prev.needsDailyDataCollection != next.needsDailyDataCollection,
+            listener: (context, state) async {
+              if (state.needsDailyDataCollection && mounted) {
+                _cubit.clearDailyDataCollectionFlag();
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => DailyDataCollectionScreen(
+                      onComplete: () => _cubit.refresh(),
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'FITZEE AI',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Good Morning, $userName',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textWhite,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.refresh,
-                                  color: AppColors.primaryGreen,
-                                  size: 24,
-                                ),
-                                onPressed: _refreshData,
-                                tooltip: 'Refresh Data',
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.leaderboard,
-                                  color: AppColors.primaryGreen,
-                                  size: 24,
-                                ),
-                                onPressed: () {
-                                  context.push('/leaderboard');
-                                },
-                                tooltip: 'Leaderboard',
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: AppColors.textWhite,
-                                  size: 28,
-                                ),
-                                onPressed: () {},
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // Health Score
-                      if (_healthScore != null) _buildHealthScoreCard(),
-                      const SizedBox(height: 24),
-                      // Daily Metrics
-                      _buildDailyMetrics(),
-                      const SizedBox(height: 24),
-                      // Progress Report Button
-                      _buildProgressReportButton(),
-                      const SizedBox(height: 24),
-                      // Nutrition Tracking
-                      _buildNutritionCard(),
-                      const SizedBox(height: 24),
-                      // Today's Workout
-                      if (_todayWorkout != null) _buildWorkoutCard(),
-                      const SizedBox(height: 24),
-                      // AI Coaching
-                      if (_healthScore != null) _buildAICoachingCard(),
-                      const SizedBox(height: 24),
-                      // Update Daily Data Button
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => DailyDataCollectionScreen(
-                                  onComplete: () {
-                                    _refreshData();
-                                  },
-                                ),
-                              ),
-                            );
-                            if (result == true) {
-                              _refreshData();
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.edit_calendar,
-                            color: AppColors.primaryGreen,
-                          ),
-                          label: const Text(
-                            'Update Daily Data',
-                            style: TextStyle(
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                );
+                if (result == true && mounted) {
+                  _cubit.refresh();
+                }
+              }
+            },
+          ),
+        ],
+        child: BlocBuilder<DashboardCubit, DashboardState>(
+          builder: (context, state) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final userName = state.userProfile?.name?.split(' ').first ?? 'User';
+
+            return Scaffold(
+              backgroundColor: context.themeScaffoldBg,
+              body: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      context.themeScaffoldBg,
+                      context.themeScaffoldBg.withValues(alpha: 0.98),
+                      context.themeScaffoldBg,
                     ],
                   ),
                 ),
+                child: SafeArea(
+                  child: state.isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryGreen,
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth < 360 ? 16 : 20,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              // Header: app name, greeting, refresh / leaderboard / menu
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'FITZEE AI',
+                                          style: TextStyle(
+                                            color: AppColors.primaryGreen,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Good Morning, $userName',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textWhite,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          color: AppColors.primaryGreen,
+                                          size: 24,
+                                        ),
+                                        onPressed: _cubit.refresh,
+                                        tooltip: 'Refresh Data',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.leaderboard,
+                                          color: AppColors.primaryGreen,
+                                          size: 24,
+                                        ),
+                                        onPressed: () => context.push('/leaderboard'),
+                                        tooltip: 'Leaderboard',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.menu_rounded,
+                                          color: AppColors.textWhite,
+                                          size: 28,
+                                        ),
+                                        onPressed: _openNavPanel,
+                                        tooltip: 'Menu',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              if (state.healthScore != null)
+                                _buildHealthScoreCard(state.healthScore!),
+                              const SizedBox(height: 24),
+                              _buildDailyMetrics(state.dailyData),
+                              const SizedBox(height: 24),
+                              _buildProgressReportButton(),
+                              const SizedBox(height: 24),
+                              _buildNutritionCard(
+                                  state.todayNutrition, state.userProfile),
+                              const SizedBox(height: 24),
+                              if (state.dailyMealPlan != null &&
+                                  state.dailyMealPlan!.hasAnyMeal)
+                                _buildDailyMealPlanSection(state.dailyMealPlan!),
+                              if (state.isLoadingAI &&
+                                  (state.dailyMealPlan == null ||
+                                      !state.dailyMealPlan!.hasAnyMeal))
+                                _buildMealPlanLoadingPlaceholder(),
+                              if (state.dailyMealPlan != null &&
+                                  state.dailyMealPlan!.hasAnyMeal)
+                                const SizedBox(height: 24),
+                              if (state.isLoadingAI &&
+                                  (state.dailyMealPlan == null ||
+                                      !state.dailyMealPlan!.hasAnyMeal))
+                                const SizedBox(height: 24),
+                              _buildMedicalInfoCard(state.todayMedicalEntries),
+                              const SizedBox(height: 24),
+                              if (state.todayWorkout != null)
+                                _buildWorkoutCard(
+                                    state.todayWorkout!, state.workoutStreak),
+                              const SizedBox(height: 24),
+                              if (state.healthScore != null)
+                                _buildAICoachingCard(state.healthScore!),
+                              const SizedBox(height: 24),
+                              Center(
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    final result =
+                                        await Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            DailyDataCollectionScreen(
+                                          onComplete: () => _cubit.refresh(),
+                                        ),
+                                      ),
+                                    );
+                                    if (result == true) {
+                                      _cubit.refresh();
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.edit_calendar,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                  label: const Text(
+                                    'Update Daily Data',
+                                    style: TextStyle(
+                                      color: AppColors.primaryGreen,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHealthScoreCard() {
-    final score = _healthScore!['score'] as int? ?? 85;
-    final scoreLabel = _healthScore!['scoreLabel'] as String? ?? 'Good';
-    final breakdown = _healthScore!['breakdown'] as Map<String, dynamic>? ?? {};
-    final bmi = _healthScore!['bmi'] as double? ?? 0.0;
-    final bmiCategory = _healthScore!['bmiCategory'] as String? ?? 'Unknown';
+  /// Builds the health score circular card from cubit state (formula-based score).
+  Widget _buildHealthScoreCard(Map<String, dynamic> healthScore) {
+    final scoreRaw = healthScore['score'];
+    final score = scoreRaw is int
+        ? scoreRaw
+        : (scoreRaw is num ? (scoreRaw as num).round() : 85);
+    final scoreLabel = healthScore['scoreLabel'] as String? ?? 'Good';
+    final breakdown = healthScore['breakdown'] as Map<String, dynamic>? ?? {};
+    final bmiRaw = healthScore['bmi'];
+    final bmi = bmiRaw is num ? (bmiRaw as num).toDouble() : 0.0;
+    final bmiCategory = healthScore['bmiCategory'] as String? ?? 'Unknown';
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -436,23 +492,23 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ],
           const SizedBox(height: 24),
-          // Breakdown
+          // Breakdown (values may be int or double from JSON)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildBreakdownItem(
                 'Fitness',
-                breakdown['fitness'] ?? 70,
+                _toInt(breakdown['fitness'], 70),
                 breakdown['fitnessLabel'] as String?,
               ),
               _buildBreakdownItem(
                 'Nutrition',
-                breakdown['nutrition'] ?? 75,
+                _toInt(breakdown['nutrition'], 75),
                 breakdown['nutritionLabel'] as String?,
               ),
               _buildBreakdownItem(
                 'Recovery',
-                breakdown['recovery'] ?? 80,
+                _toInt(breakdown['recovery'], 80),
                 breakdown['recoveryLabel'] as String?,
               ),
             ],
@@ -460,6 +516,49 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildMealPlanLoadingPlaceholder() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDarkLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.borderGreen.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppColors.primaryGreen.withOpacity(0.8),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Text(
+            'Loading suggested meals...',
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.textGray,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static int _toInt(dynamic value, int fallback) {
+    if (value is int) return value;
+    if (value is num) return (value as num).round();
+    return fallback;
   }
 
   Color _getScoreLabelColor(int score) {
@@ -510,10 +609,11 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildDailyMetrics() {
-    final steps = _dailyData?['steps'] ?? 0;
-    final calories = _dailyData?['calories'] ?? 0;
-    final sleep = _dailyData?['sleepHours'] ?? 0.0;
+  /// Builds the daily metrics row (steps, calories, etc.) from cubit state.
+  Widget _buildDailyMetrics(Map<String, dynamic>? dailyData) {
+    final steps = dailyData?['steps'] ?? 0;
+    final calories = dailyData?['calories'] ?? 0;
+    final sleep = dailyData?['sleepHours'] ?? 0.0;
     
     String stepsText = steps >= 1000 
         ? '${(steps / 1000).toStringAsFixed(1)}k'
@@ -591,13 +691,183 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildNutritionCard() {
-    final calories = _todayNutrition?.calories ?? 0.0;
-    final protein = _todayNutrition?.protein ?? 0.0;
-    final carbs = _todayNutrition?.carbs ?? 0.0;
-    final fat = _todayNutrition?.fat ?? 0.0;
-    final recommendedCalories = _userProfile != null
-        ? HealthScoreService.calculateRecommendedCalories(_userProfile)
+  /// Builds the daily suggested meal plan section: Breakfast, Lunch, Dinner tiles.
+  Widget _buildDailyMealPlanSection(DailyMealPlan plan) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDarkLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.borderGreen.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.restaurant_menu_rounded,
+                color: AppColors.primaryGreen,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                plan.planName ?? 'Today’s suggested meals',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textWhite,
+                ),
+              ),
+            ],
+          ),
+          if (plan.dailyCalories > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${plan.dailyCalories} cal total • personalized for you',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textGray,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              if (plan.breakfast != null)
+                Expanded(
+                  child: _mealPlanTile(
+                    context,
+                    'Breakfast',
+                    plan.breakfast!,
+                    Icons.free_breakfast_rounded,
+                  ),
+                ),
+              if (plan.breakfast != null && plan.lunch != null)
+                const SizedBox(width: 12),
+              if (plan.lunch != null)
+                Expanded(
+                  child: _mealPlanTile(
+                    context,
+                    'Lunch',
+                    plan.lunch!,
+                    Icons.lunch_dining_rounded,
+                  ),
+                ),
+              if (plan.lunch != null && plan.dinner != null)
+                const SizedBox(width: 12),
+              if (plan.dinner != null)
+                Expanded(
+                  child: _mealPlanTile(
+                    context,
+                    'Dinner',
+                    plan.dinner!,
+                    Icons.dinner_dining_rounded,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mealPlanTile(
+    BuildContext context,
+    String mealType,
+    MealSlot meal,
+    IconData icon,
+  ) {
+    return Material(
+      color: AppColors.backgroundDark.withOpacity(0.6),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          print('meal ${meal.description}');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => MealPlanDetailPage(
+                mealType: mealType,
+                meal: meal,
+              ),
+            ),
+          );
+          },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primaryGreen.withOpacity(0.4),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.primaryGreen, size: 32),
+              const SizedBox(height: 10),
+              Text(
+                mealType,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                meal.description.isNotEmpty ? meal.description : meal.name,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textWhite,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              if (meal.reason.isNotEmpty || meal.alternatives.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Tap for why & alternatives',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppColors.primaryGreen.withOpacity(0.9),
+                  ),
+                ),
+              ],
+              if (meal.calories > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${meal.calories} cal',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textGray,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds the nutrition summary card from cubit state.
+  /// [userProfile] is passed from state so we don't need context.read (State's context is above BlocProvider).
+  Widget _buildNutritionCard(
+      FoodNutrition? todayNutrition, UserProfile? userProfile) {
+    final calories = todayNutrition?.calories ?? 0.0;
+    final protein = todayNutrition?.protein ?? 0.0;
+    final carbs = todayNutrition?.carbs ?? 0.0;
+    final fat = todayNutrition?.fat ?? 0.0;
+    final recommendedCalories = userProfile != null
+        ? HealthScoreService.calculateRecommendedCalories(userProfile)
         : 2000;
 
     return Container(
@@ -642,7 +912,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   );
                   if (result == true) {
-                    _loadData();
+                    _cubit.refresh();
                   }
                 },
               ),
@@ -700,7 +970,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 );
                 if (result == true) {
-                  _loadData();
+                  _cubit.refresh();
                 }
               },
               style: OutlinedButton.styleFrom(
@@ -711,6 +981,138 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               child: const Text(
                 'Add Meal',
+                style: TextStyle(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the medical entries card from cubit state.
+  Widget _buildMedicalInfoCard(List<MedicalEntry> todayMedicalEntries) {
+    final entries = todayMedicalEntries;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDarkLight,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.medical_services,
+                    color: AppColors.primaryGreen,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Today\'s Medical Info',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textWhite,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.add_circle,
+                  color: AppColors.primaryGreen,
+                ),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const MedicalEntryScreen(),
+                    ),
+                  );
+                  if (result == true) _cubit.refresh();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No medical entries today. Tap + to add blood pressure, sugar level, or custom.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textGray.withOpacity(0.9),
+                ),
+              ),
+            )
+          else
+            ...entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          e.label,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textWhite,
+                          ),
+                        ),
+                        Text(
+                          '${e.dateTime.hour.toString().padLeft(2, '0')}:${e.dateTime.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textGray,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    e.displayValue,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryGreen,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const MedicalEntryScreen(),
+                  ),
+                );
+                if (result == true) _cubit.refresh();
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primaryGreen),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Add Medical Info',
                 style: TextStyle(
                   color: AppColors.primaryGreen,
                   fontWeight: FontWeight.bold,
@@ -748,9 +1150,8 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildWorkoutCard() {
-    if (_todayWorkout == null) return const SizedBox.shrink();
-
+  /// Builds the today's workout card from cubit state.
+  Widget _buildWorkoutCard(WorkoutDay todayWorkout, int workoutStreak) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -781,7 +1182,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ],
               ),
-              if (_workoutStreak > 0)
+              if (workoutStreak > 0)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -797,7 +1198,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '$_workoutStreak',
+                        '$workoutStreak',
                         style: const TextStyle(
                           color: AppColors.primaryGreen,
                           fontWeight: FontWeight.bold,
@@ -811,7 +1212,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            _todayWorkout!.workoutType.toUpperCase().replaceAll('_', ' '),
+            todayWorkout.workoutType.toUpperCase().replaceAll('_', ' '),
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.primaryGreen,
@@ -824,7 +1225,7 @@ class _DashboardPageState extends State<DashboardPage> {
               const Icon(Icons.timer, size: 16, color: AppColors.textGray),
               const SizedBox(width: 4),
               Text(
-                '${_todayWorkout!.estimatedDuration} min',
+                '${todayWorkout.estimatedDuration} min',
                 style: const TextStyle(
                   color: AppColors.textGray,
                   fontSize: 14,
@@ -834,7 +1235,7 @@ class _DashboardPageState extends State<DashboardPage> {
               const Icon(Icons.local_fire_department, size: 16, color: AppColors.textGray),
               const SizedBox(width: 4),
               Text(
-                '~${_todayWorkout!.estimatedCalories} kcal',
+                '~${todayWorkout.estimatedCalories} kcal',
                 style: const TextStyle(
                   color: AppColors.textGray,
                   fontSize: 14,
@@ -844,7 +1245,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            '${_todayWorkout!.exercises.length} exercises',
+            '${todayWorkout.exercises.length} exercises',
             style: const TextStyle(
               color: AppColors.textWhite,
               fontSize: 14,
@@ -858,12 +1259,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => WorkoutPlayerScreen(
-                      workoutDay: _todayWorkout!,
+                      workoutDay: todayWorkout,
                     ),
                   ),
                 ).then((completed) {
                   if (completed == true) {
-                    _loadData(); // Refresh to update streak
+                    _cubit.refresh(); // Refresh to update streak
                   }
                 });
               },
@@ -893,8 +1294,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildAICoachingCard() {
-    final recommendations = _healthScore!['recommendations'] as List? ?? [];
+  /// Builds the AI coaching card from cubit state.
+  Widget _buildAICoachingCard(Map<String, dynamic> healthScore) {
+    final recommendations = healthScore['recommendations'] as List? ?? [];
     final recommendation = recommendations.isNotEmpty
         ? recommendations[0] as String
         : 'Maintain your current routine and stay consistent.';

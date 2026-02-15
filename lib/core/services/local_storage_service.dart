@@ -33,6 +33,16 @@ class LocalStorageService {
     await prefs.remove(_userIdKey);
   }
 
+  /// Clear all user-related data on sign out (auth, userId, onboard, profile).
+  /// Call together with other services' clear methods for full sign-out.
+  static Future<void> clearAllUserDataOnSignOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_authKey);
+    await prefs.remove(_userIdKey);
+    await prefs.remove(_onboardCompletedKey);
+    await prefs.remove(_userProfileKey);
+  }
+
   static Future<void> setOnboardCompleted(bool completed) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardCompletedKey, completed);

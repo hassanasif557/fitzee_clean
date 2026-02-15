@@ -4,7 +4,8 @@ import 'package:fitzee_new/features/leaderboard/domain/entities/leaderboard_entr
 import 'package:fitzee_new/features/leaderboard/domain/repositories/leaderboard_repository.dart';
 import 'package:fitzee_new/features/onboard/domain/entities/user_profile.dart';
 
-/// Implementation of LeaderboardRepository
+/// Implementation of LeaderboardRepository.
+/// Ranks by health score only using daily_data (one Firestore query + parallel profile fetches).
 class LeaderboardRepositoryImpl implements LeaderboardRepository {
   final LeaderboardRemoteDataSource remoteDataSource;
 
@@ -17,78 +18,107 @@ class LeaderboardRepositoryImpl implements LeaderboardRepository {
     int limit = 100,
   }) async {
     try {
-      // Calculate date range based on period
       final endDate = DateTime.now();
       final startDate = _getStartDateForPeriod(period, endDate);
+      final days = endDate.difference(startDate).inDays;
 
-      // Get all users' daily data
+      // Single query: all users' daily data for the period
       final allDailyData = await remoteDataSource.getAllUsersDailyData(
         startDate: startDate,
         endDate: endDate,
       );
 
-      // Group data by user
+      // Group by user
       final userDataMap = <String, List<DailyData>>{};
       for (final data in allDailyData) {
-        if (!userDataMap.containsKey(data.userId)) {
-          userDataMap[data.userId] = [];
-        }
-        userDataMap[data.userId]!.add(data);
+        userDataMap.putIfAbsent(data.userId, () => []).add(data);
       }
 
-      // Calculate metrics for each user
+      final userIds = userDataMap.keys.toList();
+      if (userIds.isEmpty) return [];
+
+      // Fetch all profiles in parallel (one batch instead of N sequential)
+      final profiles = await Future.wait<UserProfile?>(
+        userIds.map((id) => remoteDataSource.getUserProfile(id)),
+      );
+      final profileMap = <String, UserProfile?>{};
+      for (var i = 0; i < userIds.length; i++) {
+        profileMap[userIds[i]] = profiles[i];
+      }
+
+      // Build entries from daily data only (no nutrition or previous-period calls)
       final entries = <LeaderboardEntry>[];
       for (final userId in userDataMap.keys) {
-        final userDailyData = userDataMap[userId]!;
-        final entry = await _calculateLeaderboardEntry(
+        final dailyData = userDataMap[userId]!;
+        final profile = profileMap[userId];
+        final entry = _entryFromDailyData(
           userId: userId,
-          dailyData: userDailyData,
-          startDate: startDate,
-          endDate: endDate,
+          dailyData: dailyData,
+          userName: profile?.name,
         );
-        if (entry != null) {
-          entries.add(entry);
-        }
+        if (entry != null) entries.add(entry);
       }
 
-      // Sort based on filter
-      entries.sort((a, b) {
-        switch (filter) {
-          case LeaderboardFilter.healthScore:
-            return b.healthScore.compareTo(a.healthScore);
-          case LeaderboardFilter.healthImprovement:
-            return b.healthScoreImprovement.compareTo(a.healthScoreImprovement);
-          case LeaderboardFilter.nutritionScore:
-            return b.nutritionScore.compareTo(a.nutritionScore);
-          case LeaderboardFilter.nutritionImprovement:
-            return b.nutritionScoreImprovement.compareTo(a.nutritionScoreImprovement);
-          case LeaderboardFilter.totalImprovement:
-            return b.totalImprovementScore.compareTo(a.totalImprovementScore);
-        }
-      });
+      // Rank by health score descending
+      entries.sort((a, b) => b.healthScore.compareTo(a.healthScore));
 
-      // Assign ranks and limit results
-      for (int i = 0; i < entries.length && i < limit; i++) {
-        entries[i] = LeaderboardEntry(
-          userId: entries[i].userId,
-          userName: entries[i].userName,
-          rank: i + 1,
-          healthScore: entries[i].healthScore,
-          healthScoreImprovement: entries[i].healthScoreImprovement,
-          nutritionScore: entries[i].nutritionScore,
-          nutritionScoreImprovement: entries[i].nutritionScoreImprovement,
-          averageSteps: entries[i].averageSteps,
-          averageCalories: entries[i].averageCalories,
-          averageSleepHours: entries[i].averageSleepHours,
-          workoutStreak: entries[i].workoutStreak,
-          profileImageUrl: entries[i].profileImageUrl,
+      // Assign ranks and limit
+      final limited = entries.take(limit).toList();
+      return limited.asMap().entries.map((e) {
+        final entry = e.value;
+        return LeaderboardEntry(
+          userId: entry.userId,
+          userName: entry.userName,
+          rank: e.key + 1,
+          healthScore: entry.healthScore,
+          healthScoreImprovement: entry.healthScoreImprovement,
+          nutritionScore: entry.nutritionScore,
+          nutritionScoreImprovement: entry.nutritionScoreImprovement,
+          averageSteps: entry.averageSteps,
+          averageCalories: entry.averageCalories,
+          averageSleepHours: entry.averageSleepHours,
+          workoutStreak: entry.workoutStreak,
+          profileImageUrl: entry.profileImageUrl,
         );
-      }
-
-      return entries.take(limit).toList();
+      }).toList();
     } catch (e) {
       throw Exception('Failed to get leaderboard: $e');
     }
+  }
+
+  /// Build one entry from a user's daily data (no extra Firestore calls).
+  LeaderboardEntry? _entryFromDailyData({
+    required String userId,
+    required List<DailyData> dailyData,
+    String? userName,
+  }) {
+    if (dailyData.isEmpty) return null;
+
+    final count = dailyData.length;
+    final totalSteps = dailyData.fold<int>(0, (s, d) => s + d.steps);
+    final totalCalories = dailyData.fold<int>(0, (s, d) => s + d.calories);
+    final totalSleep = dailyData.fold<double>(0, (s, d) => s + d.sleepHours);
+
+    final healthScores = dailyData
+        .where((d) => d.healthScore != null)
+        .map((d) => d.healthScore!);
+    final healthScore = healthScores.isNotEmpty
+        ? (healthScores.reduce((a, b) => a + b) / healthScores.length).round()
+        : 0;
+
+    return LeaderboardEntry(
+      userId: userId,
+      userName: userName,
+      rank: 0,
+      healthScore: healthScore,
+      healthScoreImprovement: 0,
+      nutritionScore: 0,
+      nutritionScoreImprovement: 0,
+      averageSteps: count > 0 ? (totalSteps / count).round() : 0,
+      averageCalories: count > 0 ? (totalCalories / count).round() : 0,
+      averageSleepHours: count > 0 ? totalSleep / count : 0.0,
+      workoutStreak: 0,
+    );
   }
 
   @override
@@ -101,15 +131,10 @@ class LeaderboardRepositoryImpl implements LeaderboardRepository {
       final leaderboard = await getLeaderboard(
         filter: filter,
         period: period,
-        limit: 1000, // Get more entries to find user's rank
+        limit: 1000,
       );
-
-      final userIndex = leaderboard.indexWhere((entry) => entry.userId == userId);
-      if (userIndex == -1) {
-        return null;
-      }
-
-      return leaderboard[userIndex].rank;
+      final index = leaderboard.indexWhere((e) => e.userId == userId);
+      return index >= 0 ? leaderboard[index].rank : null;
     } catch (e) {
       return null;
     }
@@ -127,113 +152,11 @@ class LeaderboardRepositoryImpl implements LeaderboardRepository {
         period: period,
         limit: 1000,
       );
-
-      return leaderboard.firstWhere(
-        (entry) => entry.userId == userId,
-        orElse: () => throw Exception('User not found in leaderboard'),
-      );
+      final index = leaderboard.indexWhere((e) => e.userId == userId);
+      return index >= 0 ? leaderboard[index] : null;
     } catch (e) {
       return null;
     }
-  }
-
-  /// Calculate leaderboard entry for a user
-  Future<LeaderboardEntry?> _calculateLeaderboardEntry({
-    required String userId,
-    required List<DailyData> dailyData,
-    required DateTime startDate,
-    required DateTime endDate,
-  }) async {
-    if (dailyData.isEmpty) return null;
-
-    // Get user profile for name
-    final profile = await remoteDataSource.getUserProfile(userId);
-    final userName = profile?.name;
-
-    // Calculate averages
-    final totalSteps = dailyData.fold<int>(0, (sum, data) => sum + data.steps);
-    final totalCalories = dailyData.fold<int>(0, (sum, data) => sum + data.calories);
-    final totalSleep = dailyData.fold<double>(0, (sum, data) => sum + data.sleepHours);
-    final count = dailyData.length;
-
-    final averageSteps = count > 0 ? (totalSteps / count).round() : 0;
-    final averageCalories = count > 0 ? (totalCalories / count).round() : 0;
-    final averageSleepHours = count > 0 ? (totalSleep / count) : 0.0;
-
-    // Calculate current period scores
-    final currentHealthScores = dailyData
-        .where((data) => data.healthScore != null)
-        .map((data) => data.healthScore!)
-        .toList();
-    final currentHealthScore = currentHealthScores.isNotEmpty
-        ? (currentHealthScores.reduce((a, b) => a + b) / currentHealthScores.length).round()
-        : 0;
-
-    // Get nutrition data
-    final nutritionData = await remoteDataSource.getUserNutritionData(
-      userId,
-      startDate,
-      endDate,
-    );
-    final currentNutritionScores = nutritionData
-        .where((data) => data['nutritionScore'] != null)
-        .map((data) => data['nutritionScore'] as int)
-        .toList();
-    final currentNutritionScore = currentNutritionScores.isNotEmpty
-        ? (currentNutritionScores.reduce((a, b) => a + b) / currentNutritionScores.length).round()
-        : 60;
-
-    // Calculate previous period for improvement comparison
-    final previousPeriodDays = endDate.difference(startDate).inDays;
-    final previousStartDate = startDate.subtract(Duration(days: previousPeriodDays));
-    final previousEndDate = startDate;
-
-    final previousHealthScores = await remoteDataSource.getUserHealthScoreHistory(
-      userId,
-      previousStartDate,
-      previousEndDate,
-    );
-    final previousHealthScoreList = previousHealthScores
-        .where((data) => data.healthScore != null)
-        .map((data) => data.healthScore!)
-        .toList();
-    final previousHealthScore = previousHealthScoreList.isNotEmpty
-        ? (previousHealthScoreList.reduce((a, b) => a + b) / previousHealthScoreList.length).round()
-        : currentHealthScore;
-
-    final previousNutritionData = await remoteDataSource.getUserNutritionData(
-      userId,
-      previousStartDate,
-      previousEndDate,
-    );
-    final previousNutritionScores = previousNutritionData
-        .where((data) => data['nutritionScore'] != null)
-        .map((data) => data['nutritionScore'] as int)
-        .toList();
-    final previousNutritionScore = previousNutritionScores.isNotEmpty
-        ? (previousNutritionScores.reduce((a, b) => a + b) / previousNutritionScores.length).round()
-        : currentNutritionScore;
-
-    // Calculate improvements
-    final healthScoreImprovement = currentHealthScore - previousHealthScore;
-    final nutritionScoreImprovement = currentNutritionScore - previousNutritionScore;
-
-    // Calculate workout streak (simplified - would need workout data)
-    final workoutStreak = 0; // TODO: Implement workout streak calculation
-
-    return LeaderboardEntry(
-      userId: userId,
-      userName: userName,
-      rank: 0, // Will be assigned later
-      healthScore: currentHealthScore,
-      healthScoreImprovement: healthScoreImprovement,
-      nutritionScore: currentNutritionScore,
-      nutritionScoreImprovement: nutritionScoreImprovement,
-      averageSteps: averageSteps,
-      averageCalories: averageCalories,
-      averageSleepHours: averageSleepHours,
-      workoutStreak: workoutStreak,
-    );
   }
 
   DateTime _getStartDateForPeriod(LeaderboardPeriod period, DateTime endDate) {
@@ -243,7 +166,7 @@ class LeaderboardRepositoryImpl implements LeaderboardRepository {
       case LeaderboardPeriod.month:
         return endDate.subtract(const Duration(days: 30));
       case LeaderboardPeriod.allTime:
-        return DateTime(2020, 1, 1); // Arbitrary start date
+        return DateTime(2020, 1, 1);
     }
   }
 }

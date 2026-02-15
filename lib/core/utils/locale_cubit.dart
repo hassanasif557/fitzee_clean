@@ -1,3 +1,4 @@
+/// Global locale state. Loads/saves locale and syncs with EasyLocalization for app language.
 import 'dart:ui';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

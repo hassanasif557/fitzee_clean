@@ -16,14 +16,84 @@
     "otp_required": "OTP is required",
     "otp_invalid": "Please enter a valid 6-digit OTP",
     "verify": "Verify",
-    "resend_otp": "Resend Code"
+    "resend_otp": "Resend Code",
+    "sign_in_google": "Sign in with Google"
   },
   "common": {
     "loading": "Loading...",
     "error": "Error",
     "retry": "Retry",
     "ok": "OK",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "push_description": "Push notifications are used for appointment reminders and booking confirmations.",
+    "manage": "Manage notifications",
+    "manage_hint": "To enable or disable notifications for Fitzee, open your device Settings, then Apps → Fitzee → Notifications.",
+    "open_app_settings": "Open app settings",
+    "open_settings_failed": "Could not open settings"
+  },
+  "profile": {
+    "title": "Profile",
+    "edit_profile": "Edit profile",
+    "no_profile_data": "No profile data",
+    "complete_profile": "Complete profile",
+    "personal": "Personal",
+    "activity": "Activity",
+    "name": "Name",
+    "age": "Age",
+    "gender": "Gender",
+    "height": "Height",
+    "weight": "Weight",
+    "goal": "Goal",
+    "training_days_week": "Training days/week",
+    "preferred_time": "Preferred time",
+    "sleep_avg_hrs": "Sleep (avg hrs)"
+  },
+  "edit_profile": {
+    "title": "Edit Profile",
+    "save_profile": "Save profile",
+    "profile_saved": "Profile saved",
+    "save_failed": "Failed to save",
+    "personal": "Personal",
+    "activity": "Activity",
+    "medical_optional": "Medical (optional)",
+    "optional": "optional",
+    "required": "Required"
+  },
+  "nav_panel": {
+    "menu": "Menu",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "progress_report": "Progress Report",
+    "dark_mode": "Dark mode",
+    "light_mode": "Light mode",
+    "language": "Language",
+    "sign_out": "Sign Out",
+    "delete_account": "Delete account"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "consultants": "Consultants",
+    "appointments": "Appointments",
+    "history": "History",
+    "leaderboard": "Leaderboard"
+  },
+  "dashboard": {
+    "sign_out": "Sign Out",
+    "sign_out_confirm": "Are you sure you want to sign out?",
+    "no_account_delete": "No account to delete. Sign in first.",
+    "delete_account_confirm": "Permanently delete your account and all data? This cannot be undone.",
+    "delete_account": "Delete account",
+    "delete_account_message": "This will permanently delete your account and all your data. This action cannot be undone."
   }
 }
 

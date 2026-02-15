@@ -16,14 +16,84 @@
     "otp_required": "رمز التحقق مطلوب",
     "otp_invalid": "يرجى إدخال رمز تحقق صحيح مكون من 6 أرقام",
     "verify": "تحقق",
-    "resend_otp": "إعادة إرسال الرمز"
+    "resend_otp": "إعادة إرسال الرمز",
+    "sign_in_google": "تسجيل الدخول بـ Google"
   },
   "common": {
     "loading": "جاري التحميل...",
     "error": "خطأ",
     "retry": "إعادة المحاولة",
     "ok": "موافق",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "back": "رجوع"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "push_description": "تُستخدم إشعارات الدفع لتذكيرات المواعيد وتأكيدات الحجز.",
+    "manage": "إدارة الإشعارات",
+    "manage_hint": "لتفعيل أو إلغاء تفعيل الإشعارات لـ Fitzee، افتح إعدادات جهازك، ثم التطبيقات → Fitzee → الإشعارات.",
+    "open_app_settings": "فتح إعدادات التطبيق",
+    "open_settings_failed": "تعذر فتح الإعدادات"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "edit_profile": "تعديل الملف الشخصي",
+    "no_profile_data": "لا توجد بيانات للملف الشخصي",
+    "complete_profile": "إكمال الملف الشخصي",
+    "personal": "شخصي",
+    "activity": "النشاط",
+    "name": "الاسم",
+    "age": "العمر",
+    "gender": "الجنس",
+    "height": "الطول",
+    "weight": "الوزن",
+    "goal": "الهدف",
+    "training_days_week": "أيام التدريب/الأسبوع",
+    "preferred_time": "الوقت المفضل",
+    "sleep_avg_hrs": "النوم (متوسط ساعات)"
+  },
+  "edit_profile": {
+    "title": "تعديل الملف الشخصي",
+    "save_profile": "حفظ الملف الشخصي",
+    "profile_saved": "تم حفظ الملف الشخصي",
+    "save_failed": "فشل الحفظ",
+    "personal": "شخصي",
+    "activity": "النشاط",
+    "medical_optional": "طبي (اختياري)",
+    "optional": "اختياري",
+    "required": "مطلوب"
+  },
+  "nav_panel": {
+    "menu": "القائمة",
+    "theme": "المظهر",
+    "dark": "داكن",
+    "light": "فاتح",
+    "profile": "الملف الشخصي",
+    "notifications": "الإشعارات",
+    "progress_report": "تقرير التقدم",
+    "dark_mode": "الوضع الداكن",
+    "light_mode": "الوضع الفاتح",
+    "language": "اللغة",
+    "sign_out": "تسجيل الخروج",
+    "delete_account": "حذف الحساب"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "consultants": "المستشارون",
+    "appointments": "المواعيد",
+    "history": "السجل",
+    "leaderboard": "لوحة المتصدرين"
+  },
+  "dashboard": {
+    "sign_out": "تسجيل الخروج",
+    "sign_out_confirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    "no_account_delete": "لا يوجد حساب للحذف. سجّل الدخول أولاً.",
+    "delete_account_confirm": "حذف حسابك وجميع البيانات نهائياً؟ لا يمكن التراجع عن ذلك.",
+    "delete_account": "حذف الحساب",
+    "delete_account_message": "سيتم حذف حسابك وجميع بياناتك نهائياً. لا يمكن التراجع عن هذا الإجراء."
   }
 }
 

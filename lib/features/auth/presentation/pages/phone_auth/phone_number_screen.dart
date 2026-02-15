@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
+import 'package:fitzee_new/core/services/crashlytics_service.dart';
+import 'package:fitzee_new/core/services/google_sign_in_service.dart';
+import 'package:fitzee_new/core/services/local_storage_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
+import 'package:fitzee_new/core/services/user_profile_service.dart';
 import 'cubit/phone_auth_cubit.dart';
 import '../../core/di/auth_di.dart';
 
@@ -18,6 +24,20 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   CountryCode _selectedCountryCode = CountryCode.fromCountryCode('IN');
+  bool _isGoogleSignInLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _clearGoogleCacheSoAccountPickerShows();
+  }
+
+  /// So that "Sign in with Google" shows account picker instead of auto-selecting last account.
+  Future<void> _clearGoogleCacheSoAccountPickerShows() async {
+    try {
+      await GoogleSignInService.clearCachedAccount();
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -33,6 +53,85 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
       return 'auth.phone_invalid'.tr();
     }
     return null;
+  }
+
+  /// User-friendly message for Google Sign-In platform errors (e.g. SHA-1, client ID).
+  String _googleSignInErrorMessage(PlatformException e) {
+    final code = e.code;
+    final msg = e.message ?? '';
+    if (code == 'sign_in_failed' ||
+        msg.toLowerCase().contains('sign in failed') ||
+        msg.toLowerCase().contains('developer error') ||
+        code == '10') {
+      return 'Google sign-in failed. Add your app SHA-1 in Firebase Console (Project settings > Your apps > Android) and re-download google-services.json.';
+    }
+    if (code == 'network_error' || msg.toLowerCase().contains('network')) {
+      return 'Network error. Check your connection and try again.';
+    }
+    return msg.isNotEmpty ? msg : 'Google sign-in failed. Try again.';
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isGoogleSignInLoading = true);
+    try {
+      final userCredential =
+          await GoogleSignInService.signInWithGoogle();
+      final userId = userCredential.user?.uid ?? '';
+      if (userId.isEmpty) {
+        throw Exception('Google sign-in did not return a user');
+      }
+      await LocalStorageService.saveAuthState(
+        isAuthenticated: true,
+        userId: userId,
+      );
+      await CrashlyticsService.setUserIdentifier(userId);
+      await NotificationService.saveTokenForUser(userId);
+      var isOnboardCompleted = await LocalStorageService.isOnboardCompleted();
+      // Existing user: restore onboard from Firestore if profile exists and is complete
+      if (!isOnboardCompleted && userId.isNotEmpty) {
+        final profile = await UserProfileService.getUserProfile(userId);
+        if (profile != null && profile.isComplete) {
+          await LocalStorageService.setOnboardCompleted(true);
+          isOnboardCompleted = true;
+        }
+      }
+      if (!mounted) return;
+      if (isOnboardCompleted) {
+        context.go('/dashboard');
+      } else {
+        context.go('/onboard');
+      }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'sign_in_canceled' ||
+          (e.message ?? '').toLowerCase().contains('cancel')) {
+        setState(() => _isGoogleSignInLoading = false);
+        return;
+      }
+      final String message = _googleSignInErrorMessage(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.errorRed,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      if (message.toLowerCase().contains('cancelled')) {
+        setState(() => _isGoogleSignInLoading = false);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleSignInLoading = false);
+    }
   }
 
   @override
@@ -294,6 +393,82 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                               ),
                             );
                           },
+                        ),
+                        const SizedBox(height: 24),
+                        // Divider with "or"
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                color: AppColors.borderGreen,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                'or',
+                                style: TextStyle(
+                                  color: AppColors.textGray,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                color: AppColors.borderGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Sign in with Google
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: _isGoogleSignInLoading ? null : _signInWithGoogle,
+                            icon: _isGoogleSignInLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.primaryGreen,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.g_mobiledata_rounded,
+                                    size: 28,
+                                    color: AppColors.textWhite,
+                                  ),
+                            label: Text(
+                              _isGoogleSignInLoading
+                                  ? 'Signing in...'
+                                  : 'Sign in with Google',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textWhite,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.borderGreen,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor:
+                                  AppColors.backgroundDarkLight.withOpacity(0.5),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 20),
                       ],

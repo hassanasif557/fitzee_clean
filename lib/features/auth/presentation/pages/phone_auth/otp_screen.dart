@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
+import 'package:fitzee_new/core/services/crashlytics_service.dart';
 import 'cubit/phone_auth_cubit.dart';
 import '../../core/di/auth_di.dart';
 
@@ -48,8 +49,8 @@ class _OtpScreenState extends State<OtpScreen> {
       child: BlocListener<PhoneAuthCubit, PhoneAuthState>(
         listener: (context, state) {
           if (state is PhoneAuthSuccess) {
+            CrashlyticsService.setUserIdentifier(state.userId);
             if (mounted) {
-              // Navigate based on onboard completion status
               if (state.isOnboardCompleted) {
                 context.go('/dashboard');
               } else {

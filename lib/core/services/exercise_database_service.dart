@@ -127,7 +127,7 @@ class ExerciseDatabaseService {
         'Lower your body as if sitting in a chair',
         'Keep knees behind toes',
         'Push through heels to return to start',
-      ], durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'wall_pushup',
@@ -147,7 +147,7 @@ class ExerciseDatabaseService {
         'Place hands on wall at shoulder height',
         'Bend elbows to bring chest toward wall',
         'Push back to starting position',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'standing_side_leg_raise',
@@ -167,7 +167,7 @@ class ExerciseDatabaseService {
         'Lift one leg to the side',
         'Keep your body straight',
         'Lower leg slowly and repeat',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'glute_bridge',
@@ -187,7 +187,7 @@ class ExerciseDatabaseService {
         'Lift your hips off the ground',
         'Squeeze your glutes at the top',
         'Lower slowly and repeat',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'plank',
@@ -227,7 +227,7 @@ class ExerciseDatabaseService {
         'Extend opposite arm and leg',
         'Hold for 2 seconds',
         'Return and switch sides',
-      ],durationSec: 0,
+      ],
     ),
 
     // Intermediate Exercises
@@ -249,7 +249,7 @@ class ExerciseDatabaseService {
         'Lower body until chest nearly touches floor',
         'Push back up to starting position',
         'Keep body straight throughout',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'lunges',
@@ -269,7 +269,7 @@ class ExerciseDatabaseService {
         'Lower back knee toward ground',
         'Push through front heel to return',
         'Alternate legs',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'mountain_climbers',
@@ -309,7 +309,7 @@ class ExerciseDatabaseService {
         'Jump back to plank position',
         'Do a push-up (optional)',
         'Jump feet forward and jump up',
-      ],durationSec: 0,
+      ],
     ),
 
     // Advanced Exercises
@@ -331,7 +331,7 @@ class ExerciseDatabaseService {
         'Explode upward into a jump',
         'Land softly and immediately go into next squat',
         'Keep knees aligned',
-      ],durationSec: 0,
+      ],
     ),
     Exercise(
       id: 'pike_pushup',
@@ -351,7 +351,7 @@ class ExerciseDatabaseService {
         'Lower head toward hands',
         'Push back up',
         'Keep legs straight',
-      ],durationSec: 0,
+      ],
     ),
 
     // Stretching/Cool-down

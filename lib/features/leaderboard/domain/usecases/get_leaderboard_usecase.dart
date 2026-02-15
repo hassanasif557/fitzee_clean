@@ -12,6 +12,7 @@ class GetLeaderboardUseCase {
     required LeaderboardPeriod period,
     int limit = 100,
   }) {
+    print('leaderboard usecase before repository.getLeaderboard');
     return repository.getLeaderboard(
       filter: filter,
       period: period,

@@ -2,13 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fitzee_new/core/models/daily_data.dart';
 import 'package:fitzee_new/core/models/food_nutrition.dart';
 
-/// Service to manage daily data in Firestore
+/// Service to manage daily data in Firestore.
+/// Collection: daily_data. All daily check-in fields are saved (steps, calories consumed,
+/// sleep, healthScore, bloodSugar, bloodPressure, exerciseMinutes, caloriesBurned).
 class FirestoreDailyDataService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _dailyDataCollection = 'daily_data';
   static const String _dailyNutritionCollection = 'daily_nutrition';
 
-  /// Save daily data to Firestore
+  /// Save all daily data to Firestore daily_data collection. [calories] = consumed; [caloriesBurned] = burned (optional).
   static Future<void> saveDailyData({
     required String userId,
     required int steps,
@@ -16,11 +18,15 @@ class FirestoreDailyDataService {
     required double sleepHours,
     required DateTime date,
     int? healthScore,
+    double? bloodSugar,
+    int? bloodPressureSystolic,
+    int? bloodPressureDiastolic,
+    int? exerciseMinutes,
+    int? caloriesBurned,
   }) async {
     try {
       final dateKey = DailyData.formatDateKey(date);
       final now = DateTime.now();
-      
       final dailyData = DailyData(
         userId: userId,
         date: date,
@@ -28,11 +34,14 @@ class FirestoreDailyDataService {
         calories: calories,
         sleepHours: sleepHours,
         healthScore: healthScore,
+        bloodSugar: bloodSugar,
+        bloodPressureSystolic: bloodPressureSystolic,
+        bloodPressureDiastolic: bloodPressureDiastolic,
+        exerciseMinutes: exerciseMinutes,
+        caloriesBurned: caloriesBurned,
         createdAt: now,
         updatedAt: now,
       );
-
-      // Use composite document ID: userId_dateKey
       await _firestore
           .collection(_dailyDataCollection)
           .doc('${userId}_$dateKey')
@@ -178,6 +187,32 @@ class FirestoreDailyDataService {
       return await getDailyDataRange(userId, startDate, endDate);
     } catch (e) {
       throw Exception('Failed to get health score history from Firestore: $e');
+    }
+  }
+
+  /// Get all daily data for a user as Map<dateKey, data> for History/UI.
+  static Future<Map<String, Map<String, dynamic>>> getUserDailyDataMap(
+    String userId,
+  ) async {
+    try {
+      final snapshot = await _firestore
+          .collection(_dailyDataCollection)
+          .where('userId', isEqualTo: userId)
+          .orderBy('date', descending: true)
+          .get();
+      final map = <String, Map<String, dynamic>>{};
+      for (final doc in snapshot.docs) {
+        final d = doc.data();
+        final dateStr = d['date'] as String?;
+        if (dateStr != null) {
+          final date = DateTime.parse(dateStr);
+          final dateKey = DailyData.formatDateKey(date);
+          map[dateKey] = d;
+        }
+      }
+      return map;
+    } catch (e) {
+      throw Exception('Failed to get daily data map from Firestore: $e');
     }
   }
 }

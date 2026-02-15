@@ -1,39 +1,49 @@
+import 'medical_profile.dart';
+
 class UserProfile {
   final String? userId;
   final String? name;
   final String? phone;
-  final String? goal; // 'fat_loss', 'muscle_gain', 'rehab'
+  /// User type: 'fat_loss' | 'medical' | 'rehab'. Drives questionnaire and features.
+  final String? userType;
+  /// Legacy; kept for backward compat. When userType is set, goal mirrors it.
+  final String? goal; // 'fat_loss', 'medical', 'rehab'
   final double? height; // in cm
   final double? weight; // in kg
   final String? gender; // 'male', 'female', 'other'
   final int? age;
-  
+
   // Activity History
-  final int? exerciseFrequencyPerWeek; // How often exercise per week
-  
-  // Availability
-  final int? trainingDaysPerWeek; // Days per week for training
+  final int? exerciseFrequencyPerWeek;
+  final int? trainingDaysPerWeek;
   final String? preferredTimeOfDay; // 'morning', 'afternoon', 'evening'
-  
+
   // Daily Habits
-  final double? averageSleepHours; // Average hours of sleep
-  final int? stressLevel; // Stress level 1-10
-  
-  // Medical Conditions
+  final double? averageSleepHours;
+  final int? stressLevel; // 1-10
+
+  // Medical Conditions (legacy / general)
   final bool? doctorAdvisedAgainstExercise;
   final bool? hasHeartConditions;
   final bool? hasAsthma;
   final bool? hasDiabetes;
-  
-  // Current Physical State
   final bool? hasActiveInjuries;
   final bool? hasChronicPain;
   final bool? takingPrescriptionMedications;
-  
-  // Recent Events
   final bool? hasRecentSurgeries;
   final bool? isPregnant;
-  
+
+  /// Full medical questionnaire (6 sections). Used when userType == 'medical'.
+  final MedicalProfile? medicalProfile;
+
+  /// Fat-loss specific (optional). When userType == 'fat_loss'.
+  final double? targetWeightKg;
+  final String? fatLossWeeklyGoal; // lose_1kg, lose_0_5kg, maintain
+
+  /// Rehab specific (optional). When userType == 'rehab'.
+  final List<String>? rehabFocusAreas;
+  final String? rehabPainLevel; // low, medium, high
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -41,6 +51,7 @@ class UserProfile {
     this.userId,
     this.name,
     this.phone,
+    this.userType,
     this.goal,
     this.height,
     this.weight,
@@ -60,6 +71,11 @@ class UserProfile {
     this.takingPrescriptionMedications,
     this.hasRecentSurgeries,
     this.isPregnant,
+    this.medicalProfile,
+    this.targetWeightKg,
+    this.fatLossWeeklyGoal,
+    this.rehabFocusAreas,
+    this.rehabPainLevel,
     this.createdAt,
     this.updatedAt,
   });
@@ -68,6 +84,7 @@ class UserProfile {
     String? userId,
     String? name,
     String? phone,
+    String? userType,
     String? goal,
     double? height,
     double? weight,
@@ -87,6 +104,11 @@ class UserProfile {
     bool? takingPrescriptionMedications,
     bool? hasRecentSurgeries,
     bool? isPregnant,
+    MedicalProfile? medicalProfile,
+    double? targetWeightKg,
+    String? fatLossWeeklyGoal,
+    List<String>? rehabFocusAreas,
+    String? rehabPainLevel,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -94,6 +116,7 @@ class UserProfile {
       userId: userId ?? this.userId,
       name: name ?? this.name,
       phone: phone ?? this.phone,
+      userType: userType ?? this.userType,
       goal: goal ?? this.goal,
       height: height ?? this.height,
       weight: weight ?? this.weight,
@@ -113,13 +136,21 @@ class UserProfile {
       takingPrescriptionMedications: takingPrescriptionMedications ?? this.takingPrescriptionMedications,
       hasRecentSurgeries: hasRecentSurgeries ?? this.hasRecentSurgeries,
       isPregnant: isPregnant ?? this.isPregnant,
+      medicalProfile: medicalProfile ?? this.medicalProfile,
+      targetWeightKg: targetWeightKg ?? this.targetWeightKg,
+      fatLossWeeklyGoal: fatLossWeeklyGoal ?? this.fatLossWeeklyGoal,
+      rehabFocusAreas: rehabFocusAreas ?? this.rehabFocusAreas,
+      rehabPainLevel: rehabPainLevel ?? this.rehabPainLevel,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
+  /// Mandatory for completion: userType (or legacy goal), height, weight, gender, age.
   bool get isComplete {
-    return goal != null &&
+    final type = userType ?? goal;
+    return type != null &&
+        type.isNotEmpty &&
         height != null &&
         weight != null &&
         gender != null &&
@@ -131,7 +162,8 @@ class UserProfile {
       'userId': userId,
       'name': name,
       'phone': phone,
-      'goal': goal,
+      'userType': userType,
+      'goal': goal ?? userType,
       'height': height,
       'weight': weight,
       'gender': gender,
@@ -150,6 +182,11 @@ class UserProfile {
       'takingPrescriptionMedications': takingPrescriptionMedications,
       'hasRecentSurgeries': hasRecentSurgeries,
       'isPregnant': isPregnant,
+      'medicalProfile': medicalProfile?.toJson(),
+      'targetWeightKg': targetWeightKg,
+      'fatLossWeeklyGoal': fatLossWeeklyGoal,
+      'rehabFocusAreas': rehabFocusAreas,
+      'rehabPainLevel': rehabPainLevel,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -160,6 +197,7 @@ class UserProfile {
       userId: json['userId'] as String?,
       name: json['name'] as String?,
       phone: json['phone'] as String?,
+      userType: json['userType'] as String?,
       goal: json['goal'] as String?,
       height: json['height'] != null ? (json['height'] as num).toDouble() : null,
       weight: json['weight'] != null ? (json['weight'] as num).toDouble() : null,
@@ -179,6 +217,11 @@ class UserProfile {
       takingPrescriptionMedications: json['takingPrescriptionMedications'] as bool?,
       hasRecentSurgeries: json['hasRecentSurgeries'] as bool?,
       isPregnant: json['isPregnant'] as bool?,
+      medicalProfile: MedicalProfile.fromJson(json['medicalProfile'] as Map<String, dynamic>?),
+      targetWeightKg: json['targetWeightKg'] != null ? (json['targetWeightKg'] as num).toDouble() : null,
+      fatLossWeeklyGoal: json['fatLossWeeklyGoal'] as String?,
+      rehabFocusAreas: json['rehabFocusAreas'] != null ? (json['rehabFocusAreas'] as List).cast<String>() : null,
+      rehabPainLevel: json['rehabPainLevel'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,

@@ -188,4 +188,13 @@ class WorkoutTrackingService {
   static String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
+
+  /// Clear local workout data (call on sign out for security).
+  static Future<void> clearLocalData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_workoutSessionsKey);
+    await prefs.remove(_workoutPlanKey);
+    await prefs.remove(_workoutStreakKey);
+    await prefs.remove(_lastWorkoutDateKey);
+  }
 }

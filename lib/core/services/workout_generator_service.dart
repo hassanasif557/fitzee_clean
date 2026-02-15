@@ -11,7 +11,8 @@ class WorkoutGeneratorService {
     required UserProfile? profile,
     required int daysPerWeek,
   }) {
-    final goal = profile?.goal ?? 'fat_loss';
+    final userGoal = profile?.userType ?? profile?.goal ?? 'fat_loss';
+    final goal = (userGoal == 'medical') ? 'fat_loss' : userGoal;
     final difficulty = WorkoutRulesEngine.getRecommendedDifficulty(profile);
     final allExercises = ExerciseDatabaseService.getAllExercises();
 
@@ -25,7 +26,7 @@ class WorkoutGeneratorService {
 
     if (filteredExercises.isEmpty) {
       // Fallback to beginner exercises if no matches
-      return _generateFallbackPlan(goal, difficulty, daysPerWeek);
+      return _generateFallbackPlan(userGoal, difficulty, daysPerWeek);
     }
 
     // Generate workout days
@@ -66,12 +67,12 @@ class WorkoutGeneratorService {
     );
 
     return WorkoutPlan(
-      planName: _getPlanName(goal, difficulty),
-      goal: goal,
+      planName: _getPlanName(userGoal, difficulty),
+      goal: userGoal,
       difficulty: difficulty,
       days: workoutDays,
       totalDuration: totalDuration,
-      description: _getPlanDescription(goal, difficulty),
+      description: _getPlanDescription(userGoal, difficulty),
     );
   }
 
@@ -194,9 +195,11 @@ class WorkoutGeneratorService {
   static String _getPlanName(String goal, String difficulty) {
     final goalName = goal == 'fat_loss'
         ? 'Fat Loss'
-        : goal == 'muscle_gain'
-            ? 'Muscle Gain'
-            : 'Rehabilitation';
+        : goal == 'medical'
+            ? 'Medical'
+            : goal == 'rehab'
+                ? 'Rehabilitation'
+                : 'Fat Loss';
     final difficultyName = difficulty[0].toUpperCase() + difficulty.substring(1);
     return '$goalName - $difficultyName Plan';
   }
@@ -205,16 +208,18 @@ class WorkoutGeneratorService {
   static String _getPlanDescription(String goal, String difficulty) {
     if (goal == 'fat_loss') {
       return 'A $difficulty-level workout plan focused on burning calories and improving cardiovascular health.';
-    } else if (goal == 'muscle_gain') {
-      return 'A $difficulty-level strength training plan to build muscle and increase strength.';
-    } else {
+    } else if (goal == 'medical') {
+      return 'A $difficulty-level plan designed with medical considerations in mind.';
+    } else if (goal == 'rehab') {
       return 'A gentle $difficulty-level rehabilitation plan to improve mobility and reduce pain.';
+    } else {
+      return 'A $difficulty-level workout plan tailored to your goals.';
     }
   }
 
   /// Generate fallback plan if no exercises match
   static WorkoutPlan _generateFallbackPlan(
-    String goal,
+    String userGoal,
     String difficulty,
     int daysPerWeek,
   ) {
@@ -238,7 +243,7 @@ class WorkoutGeneratorService {
 
     return WorkoutPlan(
       planName: 'Safe Beginner Plan',
-      goal: goal,
+      goal: userGoal,
       difficulty: 'beginner',
       days: workoutDays,
       totalDuration: workoutDays.fold<int>(0, (sum, day) => sum + day.estimatedDuration),

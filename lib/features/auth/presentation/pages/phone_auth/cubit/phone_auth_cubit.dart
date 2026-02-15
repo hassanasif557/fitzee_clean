@@ -1,6 +1,8 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
+import 'package:fitzee_new/core/services/user_profile_service.dart';
 import '../../../../domain/usecases/send_otp_usecase.dart';
 import '../../../../domain/usecases/verify_otp_usecase.dart';
 
@@ -41,15 +43,21 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
       );
       final userId = userCredential.user?.uid ?? '';
       
-      // Save authentication state to local storage
       await LocalStorageService.saveAuthState(
         isAuthenticated: true,
         userId: userId,
       );
-      
-      // Check if onboard is completed
-      final isOnboardCompleted =
-          await LocalStorageService.isOnboardCompleted();
+      await NotificationService.saveTokenForUser(userId);
+
+      var isOnboardCompleted = await LocalStorageService.isOnboardCompleted();
+      // Existing user: restore onboard from Firestore if profile exists and is complete
+      if (!isOnboardCompleted && userId.isNotEmpty) {
+        final profile = await UserProfileService.getUserProfile(userId);
+        if (profile != null && profile.isComplete) {
+          await LocalStorageService.setOnboardCompleted(true);
+          isOnboardCompleted = true;
+        }
+      }
       
       emit(PhoneAuthSuccess(userId, isOnboardCompleted));
     } catch (e) {

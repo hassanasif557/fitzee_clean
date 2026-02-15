@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fitzee_new/core/services/connectivity_service.dart';
 import 'package:fitzee_new/core/services/firestore_daily_data_service.dart';
+import 'package:fitzee_new/core/services/firestore_workout_service.dart';
 import 'package:fitzee_new/core/services/health_score_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/core/services/user_profile_service.dart';
@@ -10,40 +11,44 @@ class DailyDataService {
   static const String _dailyDataKey = 'daily_data';
   static const String _lastDataDateKey = 'last_data_date';
 
-  /// Save daily data - saves to both Firestore (if online) and local storage
+  /// Save daily data - saves to both Firestore (if online) and local storage.
+  /// [calories] = consumed; [caloriesBurned], [bloodSugar], [bloodPressureSystolic], [bloodPressureDiastolic], [exerciseMinutes] are optional.
   static Future<void> saveDailyData({
     required int steps,
     required int calories,
     required double sleepHours,
     required DateTime date,
     String? userId,
+    double? bloodSugar,
+    int? bloodPressureSystolic,
+    int? bloodPressureDiastolic,
+    int? exerciseMinutes,
+    int? caloriesBurned,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Get existing daily data
     final existingData = await getAllDailyData();
-    
-    // Add or update today's data
     final dateKey = _formatDate(date);
-    existingData[dateKey] = {
+    final dayData = <String, dynamic>{
       'steps': steps,
       'calories': calories,
       'sleepHours': sleepHours,
       'date': date.toIso8601String(),
     };
-    
-    // Save to local storage first
+    if (bloodSugar != null) dayData['bloodSugar'] = bloodSugar;
+    if (bloodPressureSystolic != null) dayData['bloodPressureSystolic'] = bloodPressureSystolic;
+    if (bloodPressureDiastolic != null) dayData['bloodPressureDiastolic'] = bloodPressureDiastolic;
+    if (exerciseMinutes != null) dayData['exerciseMinutes'] = exerciseMinutes;
+    if (caloriesBurned != null) dayData['caloriesBurned'] = caloriesBurned;
+    existingData[dateKey] = dayData;
+
     await prefs.setString(_dailyDataKey, jsonEncode(existingData));
     await prefs.setString(_lastDataDateKey, dateKey);
 
-    // If online and userId is provided, also save to Firestore
     final hasInternet = await ConnectivityService.hasInternetConnection();
     if (hasInternet) {
       try {
-        // Get userId if not provided
         final finalUserId = userId ?? await LocalStorageService.getUserId();
         if (finalUserId != null && finalUserId.isNotEmpty) {
-          // Calculate health score if possible
           int? healthScore;
           try {
             final profile = await UserProfileService.getUserProfile(finalUserId);
@@ -52,11 +57,8 @@ class DailyDataService {
               healthScore = scoreData['score'] as int?;
             }
           } catch (e) {
-            // If health score calculation fails, continue without it
             print('Warning: Failed to calculate health score: $e');
           }
-
-          // Save to Firestore
           await FirestoreDailyDataService.saveDailyData(
             userId: finalUserId,
             steps: steps,
@@ -64,10 +66,21 @@ class DailyDataService {
             sleepHours: sleepHours,
             date: date,
             healthScore: healthScore,
+            bloodSugar: bloodSugar,
+            bloodPressureSystolic: bloodPressureSystolic,
+            bloodPressureDiastolic: bloodPressureDiastolic,
+            exerciseMinutes: exerciseMinutes,
+            caloriesBurned: caloriesBurned,
+          );
+          await FirestoreWorkoutService.saveWorkoutData(
+            userId: finalUserId,
+            date: date,
+            steps: steps,
+            caloriesBurned: caloriesBurned,
+            exerciseMinutes: exerciseMinutes,
           );
         }
       } catch (e) {
-        // If Firestore save fails, local storage already has the data
         print('Warning: Failed to save to Firestore, using local storage: $e');
       }
     }
@@ -89,7 +102,7 @@ class DailyDataService {
     return allData[yesterdayKey];
   }
 
-  /// Get all daily data
+  /// Get all daily data (local only).
   static Future<Map<String, Map<String, dynamic>>> getAllDailyData() async {
     final prefs = await SharedPreferences.getInstance();
     final dataString = prefs.getString(_dailyDataKey);
@@ -109,6 +122,25 @@ class DailyDataService {
     }
   }
 
+  /// Get daily data map: from Firestore when online, else from local.
+  /// Use for History so data is synced from Firestore when available.
+  static Future<Map<String, Map<String, dynamic>>> getDailyDataMap() async {
+    final hasInternet = await ConnectivityService.hasInternetConnection();
+    if (hasInternet) {
+      try {
+        final userId = await LocalStorageService.getUserId();
+        if (userId != null && userId.isNotEmpty) {
+          final fromFirestore =
+              await FirestoreDailyDataService.getUserDailyDataMap(userId);
+          if (fromFirestore.isNotEmpty) return fromFirestore;
+        }
+      } catch (e) {
+        print('Warning: Failed to get daily data from Firestore: $e');
+      }
+    }
+    return getAllDailyData();
+  }
+
   /// Check if data was entered today
   static Future<bool> hasDataForToday() async {
     final todayData = await getTodayData();
@@ -125,6 +157,25 @@ class DailyDataService {
   static Future<String?> getLastDataDate() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_lastDataDateKey);
+  }
+
+  /// Get last N days of daily data as a list (newest first). For AI score / trends.
+  static Future<List<Map<String, dynamic>>> getLastNDaysData(int days) async {
+    final allData = await getAllDailyData();
+    final now = DateTime.now();
+    final list = <Map<String, dynamic>>[];
+    for (int i = 0; i < days; i++) {
+      final date = now.subtract(Duration(days: i));
+      final dateKey = _formatDate(date);
+      final data = allData[dateKey];
+      if (data != null) {
+        list.add({
+          'date': dateKey,
+          ...data,
+        });
+      }
+    }
+    return list;
   }
 
   /// Get average data for last N days
@@ -167,5 +218,12 @@ class DailyDataService {
 
   static String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Clear local daily data (call on sign out for security).
+  static Future<void> clearLocalData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_dailyDataKey);
+    await prefs.remove(_lastDataDateKey);
   }
 }

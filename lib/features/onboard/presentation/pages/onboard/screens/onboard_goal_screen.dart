@@ -113,7 +113,7 @@ class _OnboardGoalScreenState extends State<OnboardGoalScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Tell us your goals, and we\'ll build a plan that adapts to your progress using AI posture analysis.',
+                        'Choose your focus. We\'ll tailor questions and plans to your needs.',
                         style: TextStyle(
                           fontSize: screenWidth < 360 ? 14 : 16,
                           color: AppColors.textGray,
@@ -121,22 +121,22 @@ class _OnboardGoalScreenState extends State<OnboardGoalScreen> {
                         ),
                       ),
                       const SizedBox(height: 40),
-                      // Goal Options
+                      // User type: Fat loss, Medical, Rehab (no muscle gain)
                       _buildGoalOption(
                         context,
                         'fat_loss',
                         'Fat Loss',
-                        'Burn calories and lean out.',
+                        'Burn calories and lean out with tailored plans.',
                         Icons.local_fire_department,
                         const Color(0xFFFF6B35),
                       ),
                       const SizedBox(height: 16),
                       _buildGoalOption(
                         context,
-                        'muscle_gain',
-                        'Muscle Gain',
-                        'Build strength and definition.',
-                        Icons.fitness_center,
+                        'medical',
+                        'Medical',
+                        'Health-focused with full medical questionnaire.',
+                        Icons.medical_services,
                         AppColors.primaryGreen,
                       ),
                       const SizedBox(height: 16),
@@ -144,7 +144,7 @@ class _OnboardGoalScreenState extends State<OnboardGoalScreen> {
                         context,
                         'rehab',
                         'Rehab',
-                        'Recover and improve mobility.',
+                        'Physiotherapy & recovery, improve mobility.',
                         Icons.favorite,
                         const Color(0xFF4FC3F7),
                       ),
@@ -191,8 +191,7 @@ class _OnboardGoalScreenState extends State<OnboardGoalScreen> {
                               ? () {
                                   context
                                       .read<OnboardCubit>()
-                                      .setGoal(_selectedGoal!);
-                                  // Navigate to next screen
+                                      .setUserType(_selectedGoal!);
                                   if (widget.onContinue != null) {
                                     widget.onContinue!();
                                   }

@@ -119,6 +119,8 @@ final class OnboardStressLevelSet extends OnboardState {
 
 final class OnboardMedicalConditionSet extends OnboardState {}
 
+final class OnboardMedicalProfileSet extends OnboardState {}
+
 final class OnboardPhysicalStateSet extends OnboardState {}
 
 final class OnboardRecentEventsSet extends OnboardState {}

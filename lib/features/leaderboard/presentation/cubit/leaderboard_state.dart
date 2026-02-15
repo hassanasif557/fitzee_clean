@@ -1,3 +1,4 @@
+/// States for the leaderboard screen: initial, loading, loaded (with entries and filter/period), error.
 import 'package:equatable/equatable.dart';
 import 'package:fitzee_new/features/leaderboard/domain/entities/leaderboard_entry.dart';
 

@@ -1,8 +1,11 @@
+/// Cubit for the onboarding flow: holds in-memory [UserProfile] and emits step states.
+/// Loads existing profile on init; save goes through [UserProfileService] (could be refactored to use cases).
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/core/services/user_profile_service.dart';
+import 'package:fitzee_new/features/onboard/domain/entities/medical_profile.dart';
 import 'package:fitzee_new/features/onboard/domain/entities/user_profile.dart';
 
 part 'onboard_state.dart';
@@ -20,17 +23,42 @@ class OnboardCubit extends Cubit<OnboardState> {
     if (savedProfile != null) {
       _profile = savedProfile;
     }
-    
-    // Load phone from Firebase Auth if not already in profile
     final user = FirebaseAuth.instance.currentUser;
     if (user?.phoneNumber != null && _profile.phone == null) {
       _profile = _profile.copyWith(phone: user!.phoneNumber);
     }
   }
 
+  /// Sets user type: fat_loss | medical | rehab. Also sets goal for backward compat.
+  void setUserType(String userType) {
+    _profile = _profile.copyWith(userType: userType, goal: userType);
+    emit(OnboardGoalSelected(userType));
+  }
+
   void setGoal(String goal) {
-    _profile = _profile.copyWith(goal: goal);
+    _profile = _profile.copyWith(goal: goal, userType: goal);
     emit(OnboardGoalSelected(goal));
+  }
+
+  void setMedicalProfile(MedicalProfile medicalProfile) {
+    _profile = _profile.copyWith(medicalProfile: medicalProfile);
+    emit(OnboardMedicalProfileSet());
+  }
+
+  void setFatLossGoals({double? targetWeightKg, String? weeklyGoal}) {
+    _profile = _profile.copyWith(
+      targetWeightKg: targetWeightKg,
+      fatLossWeeklyGoal: weeklyGoal,
+    );
+    emit(OnboardGoalSelected(_profile.userType ?? _profile.goal ?? ''));
+  }
+
+  void setRehabGoals({List<String>? focusAreas, String? painLevel}) {
+    _profile = _profile.copyWith(
+      rehabFocusAreas: focusAreas,
+      rehabPainLevel: painLevel,
+    );
+    emit(OnboardGoalSelected(_profile.userType ?? _profile.goal ?? ''));
   }
 
   void setHeight(double height) {

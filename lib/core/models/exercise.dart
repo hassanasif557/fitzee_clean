@@ -5,7 +5,8 @@ class Exercise {
   final String description;
   final String? videoUrl; // YouTube URL or local video path
   final String? imageAsset; // Local asset path for exercise image
-  final int durationSec; // Duration in seconds (for timed exercises)
+  /// Duration in seconds (for timed exercises). For rep-based exercises, keep this as 0.
+  final int durationSec;
   final int? reps; // Number of reps (if applicable)
   final int? sets; // Number of sets (if applicable)
   final List<String> goals; // ['fat_loss', 'muscle_gain', 'rehab']
@@ -22,7 +23,7 @@ class Exercise {
     required this.description,
     this.videoUrl,
     this.imageAsset,
-    required this.durationSec,
+    this.durationSec = 0,
     this.reps,
     this.sets,
     required this.goals,
@@ -61,7 +62,7 @@ class Exercise {
       description: json['description'] as String,
       videoUrl: json['videoUrl'] as String?,
       imageAsset: json['imageAsset'] as String?,
-      durationSec: json['durationSec'] as int,
+      durationSec: json['durationSec'] as int? ?? 0,
       reps: json['reps'] as int?,
       sets: json['sets'] as int?,
       goals: (json['goals'] as List).map((e) => e as String).toList(),

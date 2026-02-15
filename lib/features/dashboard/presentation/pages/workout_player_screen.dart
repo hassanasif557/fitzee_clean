@@ -4,6 +4,9 @@ import 'package:fitzee_new/core/constants/app_colors.dart';
 import 'package:fitzee_new/core/models/exercise.dart';
 import 'package:fitzee_new/core/services/workout_tracking_service.dart';
 import 'package:fitzee_new/core/services/exercise_image_service.dart';
+import 'package:fitzee_new/core/services/firestore_workout_service.dart';
+import 'package:fitzee_new/core/services/local_storage_service.dart';
+import 'package:fitzee_new/core/services/connectivity_service.dart';
 
 class WorkoutPlayerScreen extends StatefulWidget {
   final WorkoutDay workoutDay;
@@ -123,7 +126,19 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     if (_session != null && _startTime != null) {
       final endTime = DateTime.now();
       final duration = endTime.difference(_startTime!).inMinutes;
-      final caloriesBurned = (duration * 7).round(); // Rough estimate: 7 cal/min
+      final estimatedCalories = (duration * 7).round(); // Rough estimate: 7 cal/min
+
+      // Ask user for actual calories burned (and optional steps) before saving.
+      final stats = await _showWorkoutStatsDialog(
+        context: context,
+        durationMinutes: duration,
+        estimatedCalories: estimatedCalories,
+      );
+
+      // If user cancelled the dialog, still save the session locally with estimated calories,
+      // but skip Firestore workout save.
+      final caloriesBurned = stats?['caloriesBurned'] ?? estimatedCalories;
+      final steps = stats?['steps'] ?? 0;
 
       final completedSession = WorkoutSession(
         id: _session!.id,
@@ -136,11 +151,204 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       );
 
       await WorkoutTrackingService.saveWorkoutSession(completedSession);
+
+      // Also store workout summary in Firestore workout collection: date, duration, calories burned, steps.
+      try {
+        final hasInternet = await ConnectivityService.hasInternetConnection();
+        if (hasInternet) {
+          final userId = await LocalStorageService.getUserId();
+          if (userId != null && userId.isNotEmpty) {
+            await FirestoreWorkoutService.saveWorkoutData(
+              userId: userId,
+              date: _session!.startTime,
+              steps: steps,
+              caloriesBurned: caloriesBurned,
+              exerciseMinutes: duration,
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore Firestore errors; local session is still saved and streak updated.
+      }
     }
 
     if (mounted) {
       Navigator.of(context).pop(true);
     }
+  }
+
+  /// Dialog shown when workout is finished to capture user-confirmed
+  /// calories burned and optional steps for Firestore workout logging.
+  Future<Map<String, int>?> _showWorkoutStatsDialog({
+    required BuildContext context,
+    required int durationMinutes,
+    required int estimatedCalories,
+  }) async {
+    final caloriesController =
+        TextEditingController(text: estimatedCalories.toString());
+    final stepsController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<Map<String, int>?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.backgroundDarkLight,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Workout Completed',
+            style: TextStyle(
+              color: AppColors.textWhite,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Duration: $durationMinutes min',
+                  style: const TextStyle(
+                    color: AppColors.textGray,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: caloriesController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: AppColors.textWhite),
+                  decoration: InputDecoration(
+                    labelText: 'Calories burned',
+                    labelStyle:
+                        const TextStyle(color: AppColors.textGray),
+                    hintText: estimatedCalories.toString(),
+                    prefixIcon: const Icon(
+                      Icons.local_fire_department,
+                      color: AppColors.primaryGreen,
+                      size: 20,
+                    ),
+                    suffixText: 'kcal',
+                    suffixStyle:
+                        const TextStyle(color: AppColors.textGray),
+                    filled: true,
+                    fillColor: AppColors.backgroundDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderGreen,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderGreen,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryGreen,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter calories burned';
+                    }
+                    final v = int.tryParse(value.trim());
+                    if (v == null || v <= 0) {
+                      return 'Enter a valid number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: stepsController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: AppColors.textWhite),
+                  decoration: InputDecoration(
+                    labelText: 'Steps during workout (optional)',
+                    labelStyle:
+                        const TextStyle(color: AppColors.textGray),
+                    prefixIcon: const Icon(
+                      Icons.directions_walk,
+                      color: AppColors.primaryGreen,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.backgroundDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderGreen,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderGreen,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryGreen,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // User skips manual entry – use estimated calories and no steps.
+                Navigator.of(dialogContext).pop(null);
+              },
+              child: const Text(
+                'Skip',
+                style: TextStyle(color: AppColors.textGray),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: AppColors.textBlack,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                final calories =
+                    int.parse(caloriesController.text.trim());
+                final stepsText = stepsController.text.trim();
+                final steps =
+                    stepsText.isEmpty ? 0 : int.tryParse(stepsText) ?? 0;
+                Navigator.of(dialogContext).pop(<String, int>{
+                  'caloriesBurned': calories,
+                  'steps': steps,
+                });
+              },
+              child: const Text(
+                'Save',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _formatTime(int seconds) {

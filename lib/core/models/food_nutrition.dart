@@ -34,7 +34,7 @@ class FoodNutrition {
       carbs: items.fold(0.0, (sum, item) => sum + item.carbs),
       fat: items.fold(0.0, (sum, item) => sum + item.fat),
       fiber: items.any((item) => item.fiber != null)
-          ? items.fold(0.0, (sum, item) => sum! + (item.fiber ?? 0))
+          ? items.fold<double>(0.0, (sum, item) => sum + (item.fiber ?? 0.0))
           : null,
     );
   }

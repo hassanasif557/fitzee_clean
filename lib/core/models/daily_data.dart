@@ -5,7 +5,17 @@ class DailyData {
   final int steps;
   final int calories;
   final double sleepHours;
-  final int? healthScore; // Calculated health score for the day
+  final int? healthScore;
+  /// Optional: blood sugar level (e.g. mg/dL)
+  final double? bloodSugar;
+  /// Optional: blood pressure systolic (mmHg)
+  final int? bloodPressureSystolic;
+  /// Optional: blood pressure diastolic (mmHg)
+  final int? bloodPressureDiastolic;
+  /// Optional: minutes of exercise
+  final int? exerciseMinutes;
+  /// Optional: calories burned (e.g. from exercise) — separate from [calories] which is consumed
+  final int? caloriesBurned;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -16,12 +26,17 @@ class DailyData {
     required this.calories,
     required this.sleepHours,
     this.healthScore,
+    this.bloodSugar,
+    this.bloodPressureSystolic,
+    this.bloodPressureDiastolic,
+    this.exerciseMinutes,
+    this.caloriesBurned,
     required this.createdAt,
     required this.updatedAt,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'userId': userId,
       'date': date.toIso8601String(),
       'steps': steps,
@@ -31,16 +46,27 @@ class DailyData {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
+    if (bloodSugar != null) map['bloodSugar'] = bloodSugar;
+    if (bloodPressureSystolic != null) map['bloodPressureSystolic'] = bloodPressureSystolic;
+    if (bloodPressureDiastolic != null) map['bloodPressureDiastolic'] = bloodPressureDiastolic;
+    if (exerciseMinutes != null) map['exerciseMinutes'] = exerciseMinutes;
+    if (caloriesBurned != null) map['caloriesBurned'] = caloriesBurned;
+    return map;
   }
 
   factory DailyData.fromJson(Map<String, dynamic> json) {
     return DailyData(
       userId: json['userId'] as String,
       date: DateTime.parse(json['date'] as String),
-      steps: json['steps'] as int,
-      calories: json['calories'] as int,
-      sleepHours: (json['sleepHours'] as num).toDouble(),
+      steps: (json['steps'] as num?)?.toInt() ?? 0,
+      calories: (json['calories'] as num?)?.toInt() ?? 0,
+      sleepHours: (json['sleepHours'] as num?)?.toDouble() ?? 0,
       healthScore: json['healthScore'] as int?,
+      bloodSugar: json['bloodSugar'] != null ? (json['bloodSugar'] as num).toDouble() : null,
+      bloodPressureSystolic: json['bloodPressureSystolic'] as int?,
+      bloodPressureDiastolic: json['bloodPressureDiastolic'] as int?,
+      exerciseMinutes: json['exerciseMinutes'] as int?,
+      caloriesBurned: json['caloriesBurned'] as int?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -53,6 +79,11 @@ class DailyData {
     int? calories,
     double? sleepHours,
     int? healthScore,
+    double? bloodSugar,
+    int? bloodPressureSystolic,
+    int? bloodPressureDiastolic,
+    int? exerciseMinutes,
+    int? caloriesBurned,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -63,6 +94,11 @@ class DailyData {
       calories: calories ?? this.calories,
       sleepHours: sleepHours ?? this.sleepHours,
       healthScore: healthScore ?? this.healthScore,
+      bloodSugar: bloodSugar ?? this.bloodSugar,
+      bloodPressureSystolic: bloodPressureSystolic ?? this.bloodPressureSystolic,
+      bloodPressureDiastolic: bloodPressureDiastolic ?? this.bloodPressureDiastolic,
+      exerciseMinutes: exerciseMinutes ?? this.exerciseMinutes,
+      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -16,14 +16,84 @@
     "otp_required": "El código OTP es obligatorio",
     "otp_invalid": "Por favor ingresa un código OTP válido de 6 dígitos",
     "verify": "Verificar",
-    "resend_otp": "Reenviar Código"
+    "resend_otp": "Reenviar Código",
+    "sign_in_google": "Iniciar sesión con Google"
   },
   "common": {
     "loading": "Cargando...",
     "error": "Error",
     "retry": "Reintentar",
     "ok": "OK",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "back": "Atrás"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "push_description": "Las notificaciones push se usan para recordatorios de citas y confirmaciones de reserva.",
+    "manage": "Gestionar notificaciones",
+    "manage_hint": "Para activar o desactivar notificaciones de Fitzee, abre Ajustes del dispositivo, luego Apps → Fitzee → Notificaciones.",
+    "open_app_settings": "Abrir ajustes de la app",
+    "open_settings_failed": "No se pudo abrir ajustes"
+  },
+  "profile": {
+    "title": "Perfil",
+    "edit_profile": "Editar perfil",
+    "no_profile_data": "Sin datos de perfil",
+    "complete_profile": "Completar perfil",
+    "personal": "Personal",
+    "activity": "Actividad",
+    "name": "Nombre",
+    "age": "Edad",
+    "gender": "Género",
+    "height": "Altura",
+    "weight": "Peso",
+    "goal": "Objetivo",
+    "training_days_week": "Días de entrenamiento/semana",
+    "preferred_time": "Horario preferido",
+    "sleep_avg_hrs": "Sueño (promedio hrs)"
+  },
+  "edit_profile": {
+    "title": "Editar perfil",
+    "save_profile": "Guardar perfil",
+    "profile_saved": "Perfil guardado",
+    "save_failed": "Error al guardar",
+    "personal": "Personal",
+    "activity": "Actividad",
+    "medical_optional": "Médico (opcional)",
+    "optional": "opcional",
+    "required": "Requerido"
+  },
+  "nav_panel": {
+    "menu": "Menú",
+    "theme": "Tema",
+    "dark": "Oscuro",
+    "light": "Claro",
+    "profile": "Perfil",
+    "notifications": "Notificaciones",
+    "progress_report": "Informe de progreso",
+    "dark_mode": "Modo oscuro",
+    "light_mode": "Modo claro",
+    "language": "Idioma",
+    "sign_out": "Cerrar sesión",
+    "delete_account": "Eliminar cuenta"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "consultants": "Consultores",
+    "appointments": "Citas",
+    "history": "Historial",
+    "leaderboard": "Clasificación"
+  },
+  "dashboard": {
+    "sign_out": "Cerrar sesión",
+    "sign_out_confirm": "¿Seguro que quieres cerrar sesión?",
+    "no_account_delete": "No hay cuenta que eliminar. Inicia sesión primero.",
+    "delete_account_confirm": "¿Eliminar permanentemente tu cuenta y todos los datos? No se puede deshacer.",
+    "delete_account": "Eliminar cuenta",
+    "delete_account_message": "Se eliminará permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer."
   }
 }
 
