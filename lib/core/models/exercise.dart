@@ -5,6 +5,7 @@ class Exercise {
   final String description;
   final String? videoUrl; // YouTube URL or local video path
   final String? imageAsset; // Local asset path for exercise image
+  final String? gifUrl; // URL to animated GIF showing how to do the exercise
   /// Duration in seconds (for timed exercises). For rep-based exercises, keep this as 0.
   final int durationSec;
   final int? reps; // Number of reps (if applicable)
@@ -23,6 +24,7 @@ class Exercise {
     required this.description,
     this.videoUrl,
     this.imageAsset,
+    this.gifUrl,
     this.durationSec = 0,
     this.reps,
     this.sets,
@@ -42,6 +44,7 @@ class Exercise {
       'description': description,
       'videoUrl': videoUrl,
       'imageAsset': imageAsset,
+      'gifUrl': gifUrl,
       'durationSec': durationSec,
       'reps': reps,
       'sets': sets,
@@ -62,6 +65,7 @@ class Exercise {
       description: json['description'] as String,
       videoUrl: json['videoUrl'] as String?,
       imageAsset: json['imageAsset'] as String?,
+      gifUrl: json['gifUrl'] as String?,
       durationSec: json['durationSec'] as int? ?? 0,
       reps: json['reps'] as int?,
       sets: json['sets'] as int?,

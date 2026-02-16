@@ -35,6 +35,7 @@ void main() async {
     NotificationService.refreshTokenForCurrentUser(),
     Future.delayed(const Duration(seconds: 5), () {}),
   ]);
+  NotificationService.scheduleDailyReminders();
   await EasyLocalization.ensureInitialized();
   try {
     await initDatabase();

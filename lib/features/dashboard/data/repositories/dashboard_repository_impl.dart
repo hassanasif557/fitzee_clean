@@ -1,6 +1,8 @@
 import 'package:fitzee_new/core/models/exercise.dart';
 import 'package:fitzee_new/core/services/ai_meal_service.dart';
+import 'package:fitzee_new/core/services/ai_workout_service.dart';
 import 'package:fitzee_new/core/services/daily_data_service.dart';
+import 'package:fitzee_new/core/services/step_count_service.dart';
 import 'package:fitzee_new/core/services/daily_nutrition_service.dart';
 import 'package:fitzee_new/core/services/health_score_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
@@ -23,6 +25,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
   @override
   Future<DashboardData> getDashboardData() async {
+    StepCountService.ensureListening();
     try {
       final userId = await LocalStorageService.getUserId();
       final profile = await UserProfileService.getUserProfile(userId);
@@ -38,7 +41,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
       final savedPlanJson = await WorkoutTrackingService.getWorkoutPlan();
       final workoutPlan = savedPlanJson != null
           ? WorkoutPlan.fromJson(savedPlanJson)
-          : _generateAndPersistPlan(profile);
+          : await _generateAndPersistPlan(profile);
 
       final todayWorkout =
           WorkoutGeneratorService.getTodayWorkout(workoutPlan);
@@ -87,11 +90,25 @@ class DashboardRepositoryImpl implements DashboardRepository {
     }
   }
 
-  /// Generates a new workout plan from profile and persists it via service.
-  WorkoutPlan _generateAndPersistPlan(profile) {
+  /// Generates a new workout plan: tries AI first (goal + medical/physical), then rules-based fallback.
+  Future<WorkoutPlan> _generateAndPersistPlan(profile) async {
     final daysPerWeek = profile?.trainingDaysPerWeek ??
         profile?.exerciseFrequencyPerWeek ??
         3;
+    final userGoal = profile?.userType ?? profile?.goal ?? 'fat_loss';
+
+    final aiResponse = await AiWorkoutService.generateWorkoutPlan(
+      profile: profile,
+      daysPerWeek: daysPerWeek,
+    );
+    if (aiResponse != null) {
+      final plan = AiWorkoutService.buildPlanFromAiResponse(aiResponse, userGoal);
+      if (plan != null && plan.days.isNotEmpty) {
+        WorkoutTrackingService.saveWorkoutPlan(plan.toJson());
+        return plan;
+      }
+    }
+
     final plan = WorkoutGeneratorService.generateWorkoutPlan(
       profile: profile,
       daysPerWeek: daysPerWeek,

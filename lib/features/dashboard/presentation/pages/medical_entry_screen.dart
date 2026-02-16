@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
 import 'package:fitzee_new/core/models/medical_entry.dart';
 import 'package:fitzee_new/core/services/medical_entry_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
 import 'package:intl/intl.dart';
 
 class MedicalEntryScreen extends StatefulWidget {
@@ -78,6 +79,7 @@ class _MedicalEntryScreenState extends State<MedicalEntryScreen> {
         description: desc,
       );
       await MedicalEntryService.saveMedicalEntry(entry);
+      NotificationService.showMedicalInfoAddedNotification(entryLabel: entry.label);
     } else if (_selectedType == 'sugar_level') {
       final val = double.tryParse(_sugarController.text.trim());
       if (val == null) {
@@ -93,6 +95,7 @@ class _MedicalEntryScreenState extends State<MedicalEntryScreen> {
         description: desc,
       );
       await MedicalEntryService.saveMedicalEntry(entry);
+      NotificationService.showMedicalInfoAddedNotification(entryLabel: entry.label);
     } else {
       final label = _customLabelController.text.trim();
       if (label.isEmpty) {
@@ -111,6 +114,7 @@ class _MedicalEntryScreenState extends State<MedicalEntryScreen> {
         description: desc,
       );
       await MedicalEntryService.saveMedicalEntry(entry);
+      NotificationService.showMedicalInfoAddedNotification(entryLabel: entry.label);
     }
 
     if (mounted) {

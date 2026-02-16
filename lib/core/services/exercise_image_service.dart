@@ -15,7 +15,20 @@ class ExerciseImageService {
     return _exerciseImageMap[exercise.id];
   }
 
-  /// Map of exercise IDs to their image asset paths
+  /// Get a network URL for an exercise GIF only when we have one (e.g. [Exercise.gifUrl] or map).
+  /// Returns null if no exercise-specific GIF — then use [getExerciseImage] for relevant static image.
+  static String? getExerciseGifUrl(Exercise exercise) {
+    if (exercise.gifUrl != null && exercise.gifUrl!.isNotEmpty) {
+      return exercise.gifUrl;
+    }
+    return _exerciseGifUrlMap[exercise.id];
+  }
+
+  /// Exercise-specific GIF URLs only when we have real demos. Add URLs here as you get them.
+  static final Map<String, String> _exerciseGifUrlMap = {};
+
+  /// Map of exercise IDs to their image asset paths (relevant static images per exercise).
+  /// Place images in assets/images/exercises/ and register in pubspec.yaml.
   /// Images should be placed in assets/images/exercises/
   static final Map<String, String> _exerciseImageMap = {
     // Warm-up Exercises

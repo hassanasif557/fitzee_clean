@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Step counting: required on Android 10+ for pedometer -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <application
-        android:label="fitzee_new"
+        android:label="Fitzee"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

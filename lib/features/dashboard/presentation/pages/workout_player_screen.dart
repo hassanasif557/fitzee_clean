@@ -7,6 +7,7 @@ import 'package:fitzee_new/core/services/exercise_image_service.dart';
 import 'package:fitzee_new/core/services/firestore_workout_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/core/services/connectivity_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
 
 class WorkoutPlayerScreen extends StatefulWidget {
   final WorkoutDay workoutDay;
@@ -170,6 +171,13 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       } catch (e) {
         // Ignore Firestore errors; local session is still saved and streak updated.
       }
+
+      NotificationService.showWorkoutCompletedNotification(
+        caloriesBurned: caloriesBurned,
+        durationMinutes: duration,
+      );
+    } else {
+      NotificationService.showWorkoutCompletedNotification();
     }
 
     if (mounted) {
@@ -548,8 +556,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   }
 
   Widget _buildVideoPlaceholder() {
+    final gifUrl = ExerciseImageService.getExerciseGifUrl(_currentExercise);
     final imagePath = ExerciseImageService.getExerciseImage(_currentExercise);
-    
+
     return Container(
       height: 250,
       width: double.infinity,
@@ -566,20 +575,29 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: imagePath != null
+        child: gifUrl != null
             ? Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Exercise image
-                  Image.asset(
-                    imagePath,
+                  Image.network(
+                    gifUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      // Fallback if image doesn't exist
                       return _buildPlaceholderContent();
                     },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  (loadingProgress.expectedTotalBytes ?? 1)
+                              : null,
+                          color: AppColors.primaryGreen,
+                        ),
+                      );
+                    },
                   ),
-                  // Overlay gradient for better text visibility if needed
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -592,25 +610,49 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       ),
                     ),
                   ),
-                  // Video play button overlay if video is available
-                  if (_currentExercise.videoUrl != null)
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGreen.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow,
-                          color: AppColors.textBlack,
-                          size: 40,
-                        ),
-                      ),
-                    ),
                 ],
               )
-            : _buildPlaceholderContent(),
+            : imagePath != null
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        imagePath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildPlaceholderContent();
+                        },
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_currentExercise.videoUrl != null)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGreen.withOpacity(0.9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: AppColors.textBlack,
+                              size: 40,
+                            ),
+                          ),
+                        ),
+                    ],
+                  )
+                : _buildPlaceholderContent(),
       ),
     );
   }

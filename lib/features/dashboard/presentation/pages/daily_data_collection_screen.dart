@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
 import 'package:fitzee_new/core/models/meal_preferences.dart';
 import 'package:fitzee_new/core/services/daily_data_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
 import 'package:fitzee_new/core/services/meal_preferences_service.dart';
+import 'package:fitzee_new/core/services/step_count_service.dart';
 
 class DailyDataCollectionScreen extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -105,6 +107,12 @@ class _DailyDataCollectionScreenState
 
   String _preferredCuisine = 'pakistani';
   List<String> _likedFoods = [];
+  /// Steps counted by device for yesterday (if available); used to offer "Use this" in daily data.
+  int? _deviceStepsYesterday;
+  /// Today's steps so far from device (live).
+  int _todayStepsSoFar = 0;
+  bool _stepCountAvailable = false;
+  StreamSubscription<int>? _todayStepsSubscription;
   bool _diabetes = false;
   bool _hypertension = false;
   bool _thyroidDisorder = false;
@@ -121,6 +129,27 @@ class _DailyDataCollectionScreenState
     super.initState();
     _loadYesterdayData();
     _loadMealPreferences();
+    _loadDeviceSteps();
+  }
+
+  Future<void> _loadDeviceSteps() async {
+    try {
+      await StepCountService.ensureListening();
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      final stepsYesterday = await StepCountService.getStepsForDate(yesterday);
+      final todaySteps = await StepCountService.getTodaySteps();
+      if (!mounted) return;
+      setState(() {
+        _stepCountAvailable = true;
+        _deviceStepsYesterday = stepsYesterday > 0 ? stepsYesterday : null;
+        _todayStepsSoFar = todaySteps;
+      });
+      _todayStepsSubscription ??= StepCountService.todayStepsStream.listen((steps) {
+        if (mounted) setState(() => _todayStepsSoFar = steps);
+      });
+    } catch (_) {
+      if (mounted) setState(() => _stepCountAvailable = false);
+    }
   }
 
   Future<void> _loadMealPreferences() async {
@@ -159,6 +188,7 @@ class _DailyDataCollectionScreenState
 
   @override
   void dispose() {
+    _todayStepsSubscription?.cancel();
     _stepsController.dispose();
     _caloriesController.dispose();
     _sleepController.dispose();
@@ -273,6 +303,45 @@ class _DailyDataCollectionScreenState
                       return null;
                     },
                   ),
+                  if (_deviceStepsYesterday != null && _deviceStepsYesterday! > 0) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.phone_android, size: 18, color: AppColors.primaryGreen.withOpacity(0.9)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Your device counted ${_deviceStepsYesterday} steps yesterday',
+                            style: TextStyle(fontSize: 13, color: AppColors.textGray),
+                          ),
+                          const SizedBox(width: 10),
+                          TextButton(
+                            onPressed: () {
+                              setState(() => _stepsController.text = _deviceStepsYesterday.toString());
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryGreen,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Use this'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_stepCountAvailable) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'Today so far: $_todayStepsSoFar steps (from your device)',
+                        style: TextStyle(fontSize: 12, color: AppColors.textGray),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   // Calories Input
                   TextFormField(

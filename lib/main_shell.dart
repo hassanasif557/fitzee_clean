@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 
 import 'core/constants/app_colors.dart';
 import 'core/constants/theme_ext.dart';
+import 'core/services/notification_service.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
@@ -24,6 +25,11 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final route = NotificationService.consumePendingRoute();
+      if (route != null && context.mounted) context.go(route);
+    });
+
     final currentIndex = _getIndex(context);
     final theme = Theme.of(context);
 

@@ -40,6 +40,18 @@
         "firebase-debug.*.log",
         "*.local"
       ]
+    },
+    {
+      "source": "workout",
+      "codebase": "workout",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
     }
   ]
 }

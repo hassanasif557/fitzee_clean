@@ -4,7 +4,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitzee_new/core/constants/app_colors.dart';
 import 'package:fitzee_new/features/splash/presentation/pages/splash1/cubit/splash_cubit.dart';
-import 'package:fitzee_new/features/splash/presentation/core/widgets/app_icon_widget.dart';
 import 'package:fitzee_new/features/splash/presentation/core/widgets/loading_indicator_widget.dart';
 
 class SplashPage extends StatefulWidget {
@@ -60,34 +59,63 @@ class _SplashPageState extends State<SplashPage>
     super.dispose();
   }
 
+  Widget _buildFallbackLogo(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryGreen.withOpacity(0.9),
+            AppColors.primaryGreenDark,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(size * 0.22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGreen.withOpacity(0.4),
+            blurRadius: 20,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        'F',
+        style: TextStyle(
+          fontSize: size * 0.5,
+          fontWeight: FontWeight.w300,
+          color: Colors.white,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final screenWidth = screenSize.width;
 
-    // Mobile-only responsive sizes based on screen width
-    // Small phones (320-360px)
-    // Normal phones (360-480px)
-    // Large phones (480-600px)
-    double iconSize;
-    double titleFontSize;
+    // Responsive sizes: logo, wordmark, tagline
+    double logoSize;
+    double wordmarkFontSize;
     double taglineFontSize;
 
     if (screenWidth < 360) {
-      // Small phones
-      iconSize = screenWidth * 0.25;
-      titleFontSize = screenWidth * 0.12;
-      taglineFontSize = screenWidth * 0.035;
-    } else if (screenWidth < 480) {
-      // Normal phones
-      iconSize = screenWidth * 0.25;
-      titleFontSize = screenWidth * 0.12;
-      taglineFontSize = screenWidth * 0.035;
-    } else {
-      // Large phones / Small tablets (still mobile-oriented)
-      iconSize = screenWidth * 0.22;
-      titleFontSize = screenWidth * 0.11;
+      logoSize = screenWidth * 0.28;
+      wordmarkFontSize = screenWidth * 0.14;
       taglineFontSize = screenWidth * 0.032;
+    } else if (screenWidth < 480) {
+      logoSize = screenWidth * 0.30;
+      wordmarkFontSize = screenWidth * 0.15;
+      taglineFontSize = screenWidth * 0.034;
+    } else {
+      logoSize = screenWidth * 0.26;
+      wordmarkFontSize = screenWidth * 0.13;
+      taglineFontSize = screenWidth * 0.030;
     }
 
     return BlocProvider(
@@ -127,57 +155,67 @@ class _SplashPageState extends State<SplashPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Spacer(flex: 2),
-                      // App Icon
-                      AppIconWidget(size: iconSize),
-                      const SizedBox(height: 32),
-                      // App Name with glow effect
+                      // Fitzee logo (F icon)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(logoSize * 0.22),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          width: logoSize,
+                          height: logoSize,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildFallbackLogo(logoSize),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      // Fitzee wordmark – elegant gradient + glow
                       ShaderMask(
                         shaderCallback: (bounds) => LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                           colors: [
-                            AppColors.primaryGreen,
+                            Colors.white,
                             AppColors.primaryGreenLight,
                             AppColors.primaryGreen,
                           ],
+                          stops: const [0.0, 0.5, 1.0],
                         ).createShader(bounds),
                         child: Text(
-                          'splash.app_name'.tr(),
+                          'Fitzee',
                           style: TextStyle(
-                            fontSize: titleFontSize,
-                            fontWeight: FontWeight.bold,
+                            fontSize: wordmarkFontSize,
+                            fontWeight: FontWeight.w300,
+                            letterSpacing: 8,
                             color: Colors.white,
-                            letterSpacing: 2,
+                            height: 1.15,
                             shadows: [
                               Shadow(
-                                color: AppColors.primaryGreen.withOpacity(0.8),
-                                blurRadius: 20,
+                                color: AppColors.primaryGreen.withOpacity(0.6),
+                                blurRadius: 24,
                                 offset: const Offset(0, 0),
                               ),
                               Shadow(
-                                color: AppColors.primaryGreen.withOpacity(0.5),
-                                blurRadius: 40,
+                                color: AppColors.primaryGreen.withOpacity(0.35),
+                                blurRadius: 48,
                                 offset: const Offset(0, 0),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       // Tagline
                       Text(
                         'splash.tagline'.tr(),
                         style: TextStyle(
-                          color: AppColors.textWhite,
+                          color: AppColors.textWhite.withOpacity(0.85),
                           fontSize: taglineFontSize,
                           fontWeight: FontWeight.w400,
-                          letterSpacing: 2,
+                          letterSpacing: 4,
                         ),
                       ),
                       const Spacer(flex: 3),
-                      // Loading Indicator
                       LoadingIndicatorWidget(),
-                      SizedBox(
-                        height: screenSize.height * 0.1,
-                      ),
+                      SizedBox(height: screenSize.height * 0.1),
                     ],
                   ),
                 ),

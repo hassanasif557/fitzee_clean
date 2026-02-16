@@ -3,6 +3,7 @@ import 'package:fitzee_new/core/constants/app_colors.dart';
 import 'package:fitzee_new/core/services/nutrition_database_service.dart';
 import 'package:fitzee_new/core/services/daily_nutrition_service.dart';
 import 'package:fitzee_new/core/services/local_storage_service.dart';
+import 'package:fitzee_new/core/services/notification_service.dart';
 import 'package:fitzee_new/core/models/food_item.dart';
 import 'package:fitzee_new/core/models/food_nutrition.dart';
 
@@ -107,6 +108,10 @@ class _MealEntryScreenState extends State<MealEntryScreen> {
 
       final userId = await LocalStorageService.getUserId();
       await DailyNutritionService.saveFoodEntry(entry, userId: userId);
+
+      NotificationService.showMealAddedNotification(
+        mealType: _selectedMealType,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
