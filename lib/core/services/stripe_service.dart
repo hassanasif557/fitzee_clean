@@ -1,30 +1,23 @@
-import 'dart:convert';
-
-import 'package:fitzee_new/main.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:http/http.dart' as http;
 
+/// Stripe payments: client secret must be created by your backend (e.g. Firebase
+/// callable with Stripe secret key). Never put Stripe secret key in the app.
 class StripeService {
+  /// Create a PaymentIntent via backend and present the payment sheet.
+  /// Requires a deployed Cloud Function 'createPaymentIntent' with body { amount: number }
+  /// returning { clientSecret: string }.
   static Future<bool> pay(int amount) async {
-    final response = await http.post(
-      Uri.parse('https://api.stripe.com/v1/payment_intents'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $secretKey',
-      },
-      body: {
-        'amount': '${amount}',
-        'currency': 'usd',
-        'automatic_payment_methods[enabled]': 'true',
-      },
-    );
-
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
-
-    final clientSecret = jsonDecode(response.body)['client_secret'];
-
     try {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final result = await functions.httpsCallable('createPaymentIntent').call({'amount': amount});
+      final data = result.data as Map<String, dynamic>?;
+      final clientSecret = data?['clientSecret'] as String?;
+      if (clientSecret == null || clientSecret.isEmpty) {
+        print('Stripe: no clientSecret from backend');
+        return false;
+      }
+
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
@@ -32,12 +25,11 @@ class StripeService {
         ),
       );
 
-      await Stripe.instance.presentPaymentSheet(); // ✅ only once
+      await Stripe.instance.presentPaymentSheet();
       return true;
     } catch (e) {
       print('Stripe error: $e');
       return false;
     }
-
   }
 }

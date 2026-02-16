@@ -19,8 +19,12 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'core/services/ai_meal_service.dart';
 import 'firebase_options.dart';
 
-String publishedKey = "pk_test_51Stnr9QpjDOMmIK5OiW5L3QHFFeJqZRfuDpvHljZpn5bC5vqI4wuNZLztxweFONAGVRUKA91oc4ygGlV9XFftMpm00BHciDKQO";
-String secretKey = "REMOVED";
+/// Stripe publishable key (safe to ship in app). Set via --dart-define=STRIPE_PUBLISHABLE_KEY=pk_...
+/// or leave empty and configure at runtime if needed.
+final String stripePublishableKey = const String.fromEnvironment(
+  'STRIPE_PUBLISHABLE_KEY',
+  defaultValue: '',
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,8 +47,10 @@ void main() async {
     assert(false, 'Database init failed: $e');
   }
 
-  Stripe.publishableKey = publishedKey;
-  await Stripe.instance.applySettings();
+  if (stripePublishableKey.isNotEmpty) {
+    Stripe.publishableKey = stripePublishableKey;
+    await Stripe.instance.applySettings();
+  }
 
 
 
